@@ -48,6 +48,12 @@ cd kcchase
 ./install.sh
 ```
 
+To remove the symlink:
+
+```bash
+./uninstall.sh
+```
+
 Or build manually:
 
 ```bash
