@@ -44,7 +44,13 @@ Requires a Rust toolchain (Rust 2024 edition or newer).
 git clone https://github.com/AndrewAlbrightTX/kcchase.git
 cd kcchase
 
-# Build the release binary
+# Run the installer (builds release binary and symlinks to ~/.local/bin/kcchase)
+./install.sh
+```
+
+Or build manually:
+
+```bash
 cargo build --release
 ```
 
@@ -52,7 +58,13 @@ The optimized executable will be located at `target/release/kcchase`.
 
 ## Usage
 
-Run directly as a screensaver:
+If you installed via `./install.sh` (and `~/.local/bin` is in your `PATH`):
+
+```bash
+kcchase
+```
+
+Or run directly from the repository:
 
 ```bash
 ./target/release/kcchase
