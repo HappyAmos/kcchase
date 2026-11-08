@@ -26,6 +26,7 @@ impl TerminalGuard {
         let default_hook = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
             if active_clone.swap(false, Ordering::SeqCst) {
+                let _ = write!(io::stdout(), "\x1b[?7h"); // Re-enable autowrap
                 let _ = disable_raw_mode();
                 let _ = execute!(
                     io::stdout(),
@@ -40,6 +41,8 @@ impl TerminalGuard {
         enable_raw_mode()?;
         let mut out = stdout();
         execute!(out, EnterAlternateScreen, EnableMouseCapture, Hide)?;
+        // Disable autowrap so full-width rows and bottom-right corner never trigger extra line wraps or scrolling
+        write!(out, "\x1b[?7l")?;
         out.flush()?;
 
         Ok(TerminalGuard { active })
@@ -49,6 +52,7 @@ impl TerminalGuard {
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
         if self.active.swap(false, Ordering::SeqCst) {
+            let _ = write!(io::stdout(), "\x1b[?7h"); // Re-enable autowrap
             let _ = disable_raw_mode();
             let _ = execute!(
                 io::stdout(),

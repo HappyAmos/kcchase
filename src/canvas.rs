@@ -1,4 +1,5 @@
 use crate::color::{ColorMode, Rgb};
+use std::fmt::Write as FmtWrite;
 
 /// Unicode quadrant block lookup table based on a 4-bit mask:
 /// bit 0 (1): Top-Left
@@ -168,6 +169,10 @@ impl Canvas {
         let term_h = self.term_height as usize;
 
         for cy in 0..term_h {
+            // Position cursor explicitly at row (cy + 1), col 1.
+            // This prevents automatic terminal line-wrapping from inserting an extra blank line.
+            let _ = write!(self.render_buf, "\x1b[{};1H", cy + 1);
+
             let py0 = cy * 2;
             let py1 = py0 + 1;
 
@@ -235,11 +240,6 @@ impl Canvas {
                     let ch = QUADRANT_CHARS[mask as usize];
                     self.render_buf.push(ch);
                 }
-            }
-
-            // End of line reset if needed and newline
-            if cy + 1 < term_h {
-                self.render_buf.push('\n');
             }
         }
 
