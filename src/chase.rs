@@ -210,6 +210,13 @@ impl MazeEntity {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SuperPellet {
+    pub col: i32,
+    pub row: i32,
+    pub active: bool,
+}
+
 pub struct ChaseSimulation {
     pub maze: Maze,
 
@@ -219,9 +226,7 @@ pub struct ChaseSimulation {
     pub ghost: MazeEntity,
     pub ghost_config: GhostConfig,
 
-    pub super_pellet_col: i32,
-    pub super_pellet_row: i32,
-    pub super_pellet_active: bool,
+    pub super_pellets: Vec<SuperPellet>,
 
     pub pellets: Vec<(i32, i32, bool)>,
     pub particles: Vec<Particle>,
@@ -245,9 +250,7 @@ impl ChaseSimulation {
             kc_mouth: 0.5,
             ghost: MazeEntity::new(1, 1, Direction::Left, 40.0, &Maze::generate(10, 10)),
             ghost_config,
-            super_pellet_col: 1,
-            super_pellet_row: 1,
-            super_pellet_active: true,
+            super_pellets: Vec::new(),
             pellets: Vec::new(),
             particles: Vec::new(),
             phase: Phase::ApproachingPellet,
@@ -310,18 +313,64 @@ impl ChaseSimulation {
             path_tiles.push((mid_c, mid_r + 1));
         }
 
-        // 4. Place Super Pellet in one of the path tiles (prefer outer corners/quadrants)
-        let super_idx = rng.random_range(0..path_tiles.len());
-        let (sp_c, sp_r) = path_tiles[super_idx];
-        self.super_pellet_col = sp_c;
-        self.super_pellet_row = sp_r;
-        self.super_pellet_active = true;
+        // 4. Place 4 Super Pellets, one in each corner quadrant (Top-Left, Top-Right, Bottom-Left, Bottom-Right)
+        let corner_targets: [(i32, i32, fn(i32, i32, i32, i32) -> bool); 4] = [
+            (1, 1, |c, r, mc, mr| c <= mc && r <= mr),
+            (self.maze.cols as i32 - 2, 1, |c, r, mc, mr| c >= mc && r <= mr),
+            (1, self.maze.rows as i32 - 2, |c, r, mc, mr| c <= mc && r >= mr),
+            (self.maze.cols as i32 - 2, self.maze.rows as i32 - 2, |c, r, mc, mr| c >= mc && r >= mr),
+        ];
 
-        // 5. Place KC on a path tile away from the Super Pellet
+        let mut chosen_corners = Vec::new();
+        for &(tc, tr, in_quadrant) in &corner_targets {
+            let mut best = None;
+            let mut min_dist = i32::MAX;
+            for &(pc, pr) in &path_tiles {
+                if chosen_corners.contains(&(pc, pr)) {
+                    continue;
+                }
+                if in_quadrant(pc, pr, mid_c, mid_r) {
+                    let dist = (pc - tc).pow(2) + (pr - tr).pow(2);
+                    if dist < min_dist {
+                        min_dist = dist;
+                        best = Some((pc, pr));
+                    }
+                }
+            }
+
+            // Fallback if no unchosen tile in quadrant
+            if best.is_none() {
+                for &(pc, pr) in &path_tiles {
+                    if chosen_corners.contains(&(pc, pr)) {
+                        continue;
+                    }
+                    let dist = (pc - tc).pow(2) + (pr - tr).pow(2);
+                    if dist < min_dist {
+                        min_dist = dist;
+                        best = Some((pc, pr));
+                    }
+                }
+            }
+
+            if let Some(tile) = best {
+                chosen_corners.push(tile);
+            }
+        }
+
+        self.super_pellets = chosen_corners
+            .into_iter()
+            .map(|(c, r)| SuperPellet {
+                col: c,
+                row: r,
+                active: true,
+            })
+            .collect();
+
+        // 5. Place KC on a path tile away from the Super Pellets
         let kc_candidates: Vec<(i32, i32)> = path_tiles
             .iter()
             .copied()
-            .filter(|&(c, r)| (c != sp_c || r != sp_r) && self.maze.bfs_next_direction(c, r, sp_c, sp_r).is_some())
+            .filter(|&(c, r)| !self.super_pellets.iter().any(|sp| sp.col == c && sp.row == r))
             .collect();
 
         let (kc_c, kc_r) = if !kc_candidates.is_empty() {
@@ -363,7 +412,7 @@ impl ChaseSimulation {
         // 6. Populate maze corridors with normal pellets
         self.pellets.clear();
         for &(pc, pr) in &path_tiles {
-            if !(pc == sp_c && pr == sp_r) && !(pc == kc_c && pr == kc_r) {
+            if !self.super_pellets.iter().any(|sp| sp.col == pc && sp.row == pr) && !(pc == kc_c && pr == kc_r) {
                 // Sparsely place pellets along paths
                 if rng.random_bool(0.75) {
                     self.pellets.push((pc, pr, true));
@@ -372,6 +421,28 @@ impl ChaseSimulation {
         }
 
         self.phase = Phase::ApproachingPellet;
+    }
+
+    /// Find the nearest active super pellet from (from_c, from_r)
+    pub fn nearest_active_super_pellet(&self, from_c: i32, from_r: i32) -> Option<(usize, i32, i32)> {
+        let mut best = None;
+        let mut min_dist = i32::MAX;
+
+        for (idx, sp) in self.super_pellets.iter().enumerate() {
+            if !sp.active {
+                continue;
+            }
+            if sp.col == from_c && sp.row == from_r {
+                return Some((idx, sp.col, sp.row));
+            }
+            let dist = (sp.col - from_c).abs() + (sp.row - from_r).abs();
+            if dist < min_dist {
+                min_dist = dist;
+                best = Some((idx, sp.col, sp.row));
+            }
+        }
+
+        best
     }
 
     pub fn character_radius(&self) -> f32 {
@@ -423,22 +494,27 @@ impl ChaseSimulation {
 
                 // Move KC
                 if self.kc.advance(dt, &self.maze) {
-                    // At tile center: BFS pathfind toward Super Pellet
-                    if let Some(next_dir) = self.maze.bfs_next_direction(
-                        self.kc.col,
-                        self.kc.row,
-                        self.super_pellet_col,
-                        self.super_pellet_row,
-                    ) {
-                        self.kc.set_next_direction(next_dir, &self.maze);
-                    } else {
-                        // Reached Super Pellet tile!
-                        self.super_pellet_active = false;
+                    // Check if KC reached any active Super Pellet
+                    if let Some(idx) = self.super_pellets.iter().position(|sp| sp.active && sp.col == self.kc.col && sp.row == self.kc.row) {
+                        self.super_pellets[idx].active = false;
                         let (spx, spy) = self
                             .maze
-                            .tile_to_pixel(self.super_pellet_col as f32, self.super_pellet_row as f32);
+                            .tile_to_pixel(self.kc.col as f32, self.kc.row as f32);
                         self.spawn_shockwave(spx, spy);
+                        self.spawn_sparkles(spx, spy, Rgb::new(255, 255, 100), 16);
                         next_phase = Phase::PelletChomp { timer: 0.6 };
+                    } else if let Some((_, sp_c, sp_r)) = self.nearest_active_super_pellet(self.kc.col, self.kc.row) {
+                        if let Some(next_dir) = self.maze.bfs_next_direction(
+                            self.kc.col,
+                            self.kc.row,
+                            sp_c,
+                            sp_r,
+                        ) {
+                            self.kc.set_next_direction(next_dir, &self.maze);
+                        }
+                    } else {
+                        // All super pellets eaten! KC starts chasing
+                        next_phase = Phase::KcChasing { duration: 9.0 };
                     }
                 }
 
@@ -460,12 +536,23 @@ impl ChaseSimulation {
             }
 
             Phase::KcChasing { duration } => {
-                let new_duration = duration - dt;
+                let mut new_duration = duration - dt;
                 self.kc.speed = base_speed * 1.25; // Supercharged speed!
                 self.ghost.speed = base_speed * 0.95;
 
                 // KC pursues Ghost using BFS shortest path
                 if self.kc.advance(dt, &self.maze) {
+                    // Check if KC runs over another active corner Super Pellet!
+                    if let Some(idx) = self.super_pellets.iter().position(|sp| sp.active && sp.col == self.kc.col && sp.row == self.kc.row) {
+                        self.super_pellets[idx].active = false;
+                        let (spx, spy) = self
+                            .maze
+                            .tile_to_pixel(self.kc.col as f32, self.kc.row as f32);
+                        self.spawn_shockwave(spx, spy);
+                        self.spawn_sparkles(spx, spy, Rgb::new(255, 255, 100), 16);
+                        new_duration = 9.0; // Refresh energizer duration!
+                    }
+
                     if let Some(next_dir) = self.maze.bfs_next_direction(
                         self.kc.col,
                         self.kc.row,
@@ -518,7 +605,16 @@ impl ChaseSimulation {
                 self.ghost.speed = base_speed * 0.95;
 
                 if self.kc.advance(dt, &self.maze) {
-                    if let Some(next_dir) = self.maze.bfs_next_direction(
+                    // Check if KC grabs a remaining corner Super Pellet while power is fading!
+                    if let Some(idx) = self.super_pellets.iter().position(|sp| sp.active && sp.col == self.kc.col && sp.row == self.kc.row) {
+                        self.super_pellets[idx].active = false;
+                        let (spx, spy) = self
+                            .maze
+                            .tile_to_pixel(self.kc.col as f32, self.kc.row as f32);
+                        self.spawn_shockwave(spx, spy);
+                        self.spawn_sparkles(spx, spy, Rgb::new(255, 255, 100), 16);
+                        next_phase = Phase::PelletChomp { timer: 0.5 };
+                    } else if let Some(next_dir) = self.maze.bfs_next_direction(
                         self.kc.col,
                         self.kc.row,
                         self.ghost.col,
@@ -539,7 +635,9 @@ impl ChaseSimulation {
                     self.ghost.set_next_direction(flee_dir, &self.maze);
                 }
 
-                if new_duration <= 0.0 {
+                if matches!(next_phase, Phase::PelletChomp { .. }) {
+                    // KC ate a super pellet, stay in PelletChomp!
+                } else if new_duration <= 0.0 {
                     // Effect completely faded! Ghost turns around and hunts KC!
                     self.spawn_shockwave(self.ghost.x, self.ghost.y);
                     next_phase = Phase::GhostChasing { duration: 12.0 };
@@ -569,21 +667,34 @@ impl ChaseSimulation {
 
                 // KC flees in panic away from Ghost!
                 if self.kc.advance(dt, &self.maze) {
-                    let flee_dir = self.maze.flee_direction(
-                        self.kc.col,
-                        self.kc.row,
-                        self.ghost.col,
-                        self.ghost.row,
-                        self.kc.dir,
-                    );
-                    self.kc.set_next_direction(flee_dir, &self.maze);
+                    // Check if KC reaches one of the remaining corner Super Pellets while fleeing!
+                    if let Some(idx) = self.super_pellets.iter().position(|sp| sp.active && sp.col == self.kc.col && sp.row == self.kc.row) {
+                        self.super_pellets[idx].active = false;
+                        let (spx, spy) = self
+                            .maze
+                            .tile_to_pixel(self.kc.col as f32, self.kc.row as f32);
+                        self.spawn_shockwave(spx, spy);
+                        self.spawn_sparkles(spx, spy, Rgb::new(255, 255, 100), 16);
+                        next_phase = Phase::PelletChomp { timer: 0.5 };
+                    } else {
+                        let flee_dir = self.maze.flee_direction(
+                            self.kc.col,
+                            self.kc.row,
+                            self.ghost.col,
+                            self.ghost.row,
+                            self.kc.dir,
+                        );
+                        self.kc.set_next_direction(flee_dir, &self.maze);
+                    }
                 }
 
                 // Check if Ghost catches KC!
                 let dist = entity_distance(&self.ghost, &self.kc, &self.maze);
                 let catch_threshold = self.character_radius() * 1.6;
 
-                if dist < catch_threshold {
+                if matches!(next_phase, Phase::PelletChomp { .. }) {
+                    // KC ate an energizer super pellet and turned the tables on the ghost!
+                } else if dist < catch_threshold {
                     // GHOST CAUGHT KC!
                     self.spawn_shockwave(self.kc.x, self.kc.y);
                     self.spawn_sparkles(self.kc.x, self.kc.y, Rgb::new(255, 60, 60), 20);
@@ -668,13 +779,15 @@ impl ChaseSimulation {
             }
         }
 
-        // 3. Draw Super Pellet if active
-        if self.super_pellet_active {
-            let (spx, spy) = self
-                .maze
-                .tile_to_pixel(self.super_pellet_col as f32, self.super_pellet_row as f32);
-            let pellet_rad = (self.character_radius() * 0.7).max(2.2);
-            draw_super_pellet(canvas, spx, spy, pellet_rad, self.anim_time);
+        // 3. Draw Super Pellets if active
+        let pellet_rad = (self.character_radius() * 0.7).max(2.2);
+        for sp in &self.super_pellets {
+            if sp.active {
+                let (spx, spy) = self
+                    .maze
+                    .tile_to_pixel(sp.col as f32, sp.row as f32);
+                draw_super_pellet(canvas, spx, spy, pellet_rad, self.anim_time);
+            }
         }
 
         // 4. Draw active particles
@@ -1019,21 +1132,25 @@ mod tests {
         for _ in 0..50 {
             let sim = ChaseSimulation::new(120, 60);
 
-            // Verify KC can reach the Super Pellet
-            let path_to_sp = sim.maze.bfs_next_direction(
-                sim.kc.col,
-                sim.kc.row,
-                sim.super_pellet_col,
-                sim.super_pellet_row,
-            );
-            assert!(
-                path_to_sp.is_some(),
-                "KC at ({}, {}) cannot reach Super Pellet at ({}, {})!",
-                sim.kc.col,
-                sim.kc.row,
-                sim.super_pellet_col,
-                sim.super_pellet_row
-            );
+            // Verify all 4 corner Super Pellets are reachable from KC
+            assert_eq!(sim.super_pellets.len(), 4);
+            for sp in &sim.super_pellets {
+                let path_to_sp = sim.maze.bfs_next_direction(
+                    sim.kc.col,
+                    sim.kc.row,
+                    sp.col,
+                    sp.row,
+                );
+                // Either already at tile or reachable via BFS
+                assert!(
+                    (sim.kc.col == sp.col && sim.kc.row == sp.row) || path_to_sp.is_some(),
+                    "KC at ({}, {}) cannot reach Super Pellet at ({}, {})!",
+                    sim.kc.col,
+                    sim.kc.row,
+                    sp.col,
+                    sp.row
+                );
+            }
 
             // Verify KC can reach Ghost
             let path_to_ghost = sim.maze.bfs_next_direction(
@@ -1043,7 +1160,7 @@ mod tests {
                 sim.ghost.row,
             );
             assert!(
-                path_to_ghost.is_some(),
+                (sim.kc.col == sim.ghost.col && sim.kc.row == sim.ghost.row) || path_to_ghost.is_some(),
                 "KC at ({}, {}) cannot reach Ghost at ({}, {})!",
                 sim.kc.col,
                 sim.kc.row,
@@ -1051,5 +1168,50 @@ mod tests {
                 sim.ghost.row
             );
         }
+    }
+
+    #[test]
+    fn test_four_corner_super_pellets_and_re_energize() {
+        let mut sim = ChaseSimulation::new(120, 60);
+
+        // Verify exactly 4 super pellets
+        assert_eq!(sim.super_pellets.len(), 4);
+        assert!(sim.super_pellets.iter().all(|sp| sp.active));
+
+        let mid_c = sim.maze.cols as i32 / 2;
+        let mid_r = sim.maze.rows as i32 / 2;
+
+        // Check each quadrant has one pellet
+        let top_left = sim.super_pellets.iter().any(|sp| sp.col <= mid_c && sp.row <= mid_r);
+        let top_right = sim.super_pellets.iter().any(|sp| sp.col >= mid_c && sp.row <= mid_r);
+        let bot_left = sim.super_pellets.iter().any(|sp| sp.col <= mid_c && sp.row >= mid_r);
+        let bot_right = sim.super_pellets.iter().any(|sp| sp.col >= mid_c && sp.row >= mid_r);
+        assert!(top_left && top_right && bot_left && bot_right, "All four quadrants must have a corner pellet");
+
+        // Test fleeing in GhostChasing and touching a corner super pellet turns the tables!
+        sim.phase = Phase::GhostChasing { duration: 10.0 };
+        let pellet_tile = (sim.super_pellets[0].col, sim.super_pellets[0].row);
+        sim.kc.col = pellet_tile.0;
+        sim.kc.row = pellet_tile.1;
+        sim.kc.target_col = pellet_tile.0;
+        sim.kc.target_row = pellet_tile.1;
+        let (px, py) = sim.maze.tile_to_pixel(pellet_tile.0 as f32, pellet_tile.1 as f32);
+        sim.kc.x = px;
+        sim.kc.y = py;
+
+        // Position Ghost far away so ghost catch doesn't trigger
+        sim.ghost.col = sim.maze.cols as i32 - 2;
+        sim.ghost.row = sim.maze.rows as i32 - 2;
+        let (gx, gy) = sim.maze.tile_to_pixel(sim.ghost.col as f32, sim.ghost.row as f32);
+        sim.ghost.x = gx;
+        sim.ghost.y = gy;
+
+        // Update one step
+        sim.update(0.01);
+
+        // Pellet 0 should now be inactive
+        assert!(!sim.super_pellets[0].active);
+        // Phase should have switched to PelletChomp
+        assert!(matches!(sim.phase, Phase::PelletChomp { .. }));
     }
 }
