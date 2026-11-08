@@ -37,16 +37,44 @@ A high-resolution retro terminal screensaver inspired by the classic Magnavox Od
 
 ## Installation & Building
 
-Requires a Rust toolchain (Rust 2024 edition or newer).
+### 1. Prerequisites: Install Rust (if not already installed)
+
+`kcchase` requires a Rust toolchain (Rust 2024 edition or newer). If you do not have Rust installed yet, install it using the official [rustup](https://rustup.rs) installer:
+
+```bash
+# Download and install rustup (Linux & macOS)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Configure your current shell session
+source "$HOME/.cargo/env"
+```
+
+Verify that the toolchain is available:
+```bash
+rustc --version
+cargo --version
+```
+
+### 2. Install kcchase with `install.sh`
+
+Clone the repository and run the `install.sh` script. It automatically compiles the optimized release binary and symlinks it to `~/.local/bin/kcchase`:
 
 ```bash
 # Clone the repository
 git clone https://github.com/AndrewAlbrightTX/kcchase.git
 cd kcchase
 
-# Run the installer (builds release binary and symlinks to ~/.local/bin/kcchase)
+# Run the installer
 ./install.sh
 ```
+
+> [!NOTE]
+> Ensure `~/.local/bin` is in your system's `$PATH`. If it isn't already, add the following to your `~/.bashrc`, `~/.zshrc`, or `~/.profile`:
+> ```bash
+> export PATH="$HOME/.local/bin:$PATH"
+> ```
+
+### Uninstallation
 
 To remove the symlink:
 
@@ -54,7 +82,9 @@ To remove the symlink:
 ./uninstall.sh
 ```
 
-Or build manually:
+### Manual Build (Alternative)
+
+If you prefer building without creating a global symlink:
 
 ```bash
 cargo build --release

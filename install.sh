@@ -7,6 +7,14 @@ BIN_PATH="${REPO_DIR}/target/release/kcchase"
 TARGET_DIR="${HOME}/.local/bin"
 TARGET_LINK="${TARGET_DIR}/kcchase"
 
+if ! command -v cargo &> /dev/null; then
+    echo "Error: 'cargo' is not installed or not in your PATH." >&2
+    echo "To install Rust and Cargo, run:" >&2
+    echo "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh" >&2
+    echo "  source \"\$HOME/.cargo/env\"" >&2
+    exit 1
+fi
+
 echo "==> Building kcchase (release mode)..."
 cargo build --release --manifest-path "${REPO_DIR}/Cargo.toml"
 
