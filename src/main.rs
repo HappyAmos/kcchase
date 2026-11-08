@@ -1,6 +1,7 @@
 mod canvas;
 mod chase;
 mod color;
+mod maze;
 mod sprites;
 mod terminal;
 

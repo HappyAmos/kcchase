@@ -4,14 +4,18 @@ A high-resolution retro terminal screensaver inspired by the classic Magnavox Od
 
 ## Features
 
+- **Anti-Burn-In Procedural Arcade Mazes**:
+  - Replaces all static borders and corners with **randomized Pac-Man / Odyssey² style mazes** featuring symmetrical corridors, wall blocks, T-junctions, and edge warp tunnels.
+  - Characters navigate strictly through the open corridors and turns using BFS pathfinding.
+  - **Dynamic Maze Refresh**: As soon as one character catches the other (K.C. chomps the vulnerable ghost, or the hunting ghost catches K.C.), the maze explodes in celebratory retro arcade particles and **immediately regenerates a completely new random maze pattern** with new wall layouts, glowing neon colors, character sizes, and pellet routes. This guarantees no static pixels linger on screen.
 - **Iconic Odyssey² Animation Cycle**:
-  1. K.C. Munchkin approaches and chomps a pulsing **Super Pellet**, triggering a shockwave burst.
-  2. K.C. gains an energetic aura while the Muncher ghost turns frightened blue and flees in panic.
-  3. K.C. aggressively chases the ghost around the arena while gobbling pellets.
-  4. The super-charge effect begins to wear off; the ghost frantically flashes between blue and bright warning colors.
-  5. The effect fades completely: the ghost reverts to its menacing color, turns around, and actively hunts K.C.!
-  6. K.C. flees in terror with wide eyes and sweat flying, before escaping off-screen.
-  7. On each pass, the characters can vary in size, randomize the ghost (Bit, Byte, Middie, or Orange), reposition the super pellet, and generate a new arena layout.
+  1. K.C. Munchkin navigates corridors toward a pulsing **Super Pellet**, chomping normal pellets along the way.
+  2. Chomping the Super Pellet triggers an expanding shockwave; K.C. gains an energized aura while the Muncher ghost turns frightened blue and flees through maze corners.
+  3. K.C. aggressively chases the ghost through the corridors.
+  4. The power effect fades with the ghost flashing warning colors.
+  5. The ghost reverts to its normal color, turns around, and actively hunts K.C. through the maze.
+  6. K.C. flees in terror with wide eyes and flying sweat drops.
+  7. When either character catches the other, the map refreshes into a fresh random maze!
 - **High-Resolution ANSI Block Graphics**:
   - Uses Unicode quadrant (`▘▝▖▗▌▐▞▚▛▜▙▟█`) and half-block (`▀▄`) sub-pixels to render 2×2 virtual pixels per terminal character cell.
   - Smooth antialiased procedural sprites for K.C.'s horns, chomping mouth, animated eyes, and the ghost's wavy skirt ripples.
