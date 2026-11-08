@@ -22,6 +22,7 @@ struct AppArgs {
     start_sequence: StartSequence,
     show_info: bool,
     show_help: bool,
+    show_version: bool,
 }
 
 fn parse_args() -> AppArgs {
@@ -42,12 +43,16 @@ where
     let mut start_sequence = StartSequence::Game;
     let mut show_info = false;
     let mut show_help = false;
+    let mut show_version = false;
 
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
             "-h" | "--help" => {
                 show_help = true;
+            }
+            "-v" | "--version" => {
+                show_version = true;
             }
             "-i" | "--info" => {
                 show_info = true;
@@ -126,7 +131,12 @@ where
         start_sequence,
         show_info,
         show_help,
+        show_version,
     }
+}
+
+fn print_version() {
+    println!("kcchase {}", env!("CARGO_PKG_VERSION"));
 }
 
 fn print_help() {
@@ -137,6 +147,7 @@ fn print_help() {
     println!();
     println!("OPTIONS:");
     println!("    -h, --help               Print this help message and exit");
+    println!("    -v, --version            Print version information and exit");
     println!("    -i, --info               Display detected terminal color capabilities and exit");
     println!("    -c, --color <MODE>       Select color mode: truecolor, 256, 16, 8 (default: auto)");
     println!("    --fps <NUMBER>           Set target frame rate (default: 60, range: 15-120)");
@@ -163,6 +174,11 @@ fn print_info(detected: ColorMode) {
 
 fn main() -> io::Result<()> {
     let args = parse_args();
+
+    if args.show_version {
+        print_version();
+        return Ok(());
+    }
 
     if args.show_help {
         print_help();
@@ -319,5 +335,17 @@ mod tests {
 
         let args_seq_game = parse_args_from(vec!["kcchase", "--sequence", "game"]);
         assert_eq!(args_seq_game.start_sequence, StartSequence::Game);
+    }
+
+    #[test]
+    fn test_version_flags() {
+        let args_short = parse_args_from(vec!["kcchase", "-v"]);
+        assert!(args_short.show_version);
+
+        let args_long = parse_args_from(vec!["kcchase", "--version"]);
+        assert!(args_long.show_version);
+
+        let args_default = parse_args_from(vec!["kcchase"]);
+        assert!(!args_default.show_version);
     }
 }

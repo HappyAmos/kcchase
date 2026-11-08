@@ -2,11 +2,14 @@
 
 A high-resolution retro terminal screensaver inspired by the classic 
 Magnavox Odyssey² / Philips Videopac game **K.C. Munchkin!** (1981).
+Pretty much a screensaver game that plays itself. Includes cut-
+scene after KC dies twice to clear the screen for a bit, then
+resumes game mode. Score tallies, but is not written to disk, so 
+hi-score starts at 0 on each launch.
 
 ## Features
 
-- **Anti-Burn-In Procedural Arcade Mazes**:
-- **Dynamic Maze Refresh**
+- **Procedural Arcade Mazes**:
 - **Full Terminal Screen Fitting & Dynamic Resizing**:
 - **Color Capability Detection**:
 - **Screensaver Style Exit**:
@@ -95,6 +98,7 @@ USAGE:
 
 OPTIONS:
     -h, --help               Print this help message and exit
+    -v, --version            Print version information and exit
     -i, --info               Display detected terminal color capabilities and exit
     -c, --color <MODE>       Select color mode: truecolor, 256, 16, 8 (default: auto)
     --fps <NUMBER>           Set target frame rate (default: 60, range: 15-120)
