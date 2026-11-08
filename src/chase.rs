@@ -2,7 +2,8 @@ use crate::canvas::Canvas;
 use crate::color::Rgb;
 use crate::maze::{Direction, Maze, Tile};
 use crate::sprites::{
-    draw_ghost, draw_kc_munchkin, draw_pellet, draw_super_pellet, GhostConfig, GhostState,
+    draw_ghost, draw_ghost_death, draw_kc_cheering, draw_kc_munchkin, draw_pellet,
+    draw_super_pellet, GhostConfig, GhostState,
 };
 use rand::RngExt;
 use std::f32::consts::PI;
@@ -19,12 +20,22 @@ pub enum Phase {
     PowerFading { duration: f32 },
     /// Ghost is chasing KC, KC is fleeing in panic through the maze
     GhostChasing { duration: f32 },
-    /// One caught the other! Arcade catch celebration before refreshing maze
-    CatchCelebration {
+    /// KC caught the ghost! Ghost plays its death animation first
+    GhostDeath {
         timer: f32,
-        kc_caught_ghost: bool,
-        cx: f32,
-        cy: f32,
+        max_timer: f32,
+        ghost_x: f32,
+        ghost_y: f32,
+    },
+    /// Immediately after ghost death: KC faces the camera with a cute toothy smile,
+    /// quickly grows arms and legs at 45 degree angles, and pumps them to cheer!
+    KcCheer {
+        timer: f32,
+        cheer_time: f32,
+    },
+    /// Ghost caught KC: defeat effect before maze refresh
+    GhostCatchKc {
+        timer: f32,
     },
 }
 
@@ -273,18 +284,30 @@ impl ChaseSimulation {
             _ => GhostConfig::orange_muncher(),
         };
 
-        // 3. Find all available path tiles
+        // 3. Find all available path tiles that are strictly reachable from center
+        let mid_c = self.maze.cols as i32 / 2;
+        let mid_r = self.maze.rows as i32 / 2;
+
         let mut path_tiles = Vec::new();
         for r in 1..self.maze.rows - 1 {
             for c in 1..self.maze.cols - 1 {
                 if self.maze.tiles[r * self.maze.cols + c] == Tile::Path {
-                    path_tiles.push((c as i32, r as i32));
+                    let tc = c as i32;
+                    let tr = r as i32;
+                    if (tc == mid_c && tr == mid_r)
+                        || self.maze.bfs_next_direction(tc, tr, mid_c, mid_r).is_some()
+                    {
+                        path_tiles.push((tc, tr));
+                    }
                 }
             }
         }
 
-        if path_tiles.is_empty() {
-            path_tiles.push((1, 1));
+        if path_tiles.len() < 4 {
+            path_tiles.push((mid_c, mid_r));
+            path_tiles.push((mid_c + 1, mid_r));
+            path_tiles.push((mid_c - 1, mid_r));
+            path_tiles.push((mid_c, mid_r + 1));
         }
 
         // 4. Place Super Pellet in one of the path tiles (prefer outer corners/quadrants)
@@ -294,20 +317,34 @@ impl ChaseSimulation {
         self.super_pellet_row = sp_r;
         self.super_pellet_active = true;
 
-        // 5. Place KC and Ghost on path tiles at good distance from each other
-        let kc_idx = rng.random_range(0..path_tiles.len());
-        let (kc_c, kc_r) = path_tiles[kc_idx];
+        // 5. Place KC on a path tile away from the Super Pellet
+        let kc_candidates: Vec<(i32, i32)> = path_tiles
+            .iter()
+            .copied()
+            .filter(|&(c, r)| (c != sp_c || r != sp_r) && self.maze.bfs_next_direction(c, r, sp_c, sp_r).is_some())
+            .collect();
 
-        // Find ghost tile with maximum distance from KC
+        let (kc_c, kc_r) = if !kc_candidates.is_empty() {
+            kc_candidates[rng.random_range(0..kc_candidates.len())]
+        } else {
+            (mid_c, mid_r)
+        };
+
+        // Find ghost tile with maximum distance from KC that is GUARANTEED to have a path to KC!
         let mut best_ghost_tile = path_tiles[0];
         let mut max_dist = -1.0;
         for &(gc, gr) in &path_tiles {
-            let dc = gc - kc_c;
-            let dr = gr - kc_r;
-            let dist = (dc * dc + dr * dr) as f32;
-            if dist > max_dist {
-                max_dist = dist;
-                best_ghost_tile = (gc, gr);
+            if gc == kc_c && gr == kc_r {
+                continue;
+            }
+            if self.maze.bfs_next_direction(gc, gr, kc_c, kc_r).is_some() {
+                let dc = gc - kc_c;
+                let dr = gr - kc_r;
+                let dist = (dc * dc + dr * dr) as f32;
+                if dist > max_dist {
+                    max_dist = dist;
+                    best_ghost_tile = (gc, gr);
+                }
             }
         }
 
@@ -459,11 +496,11 @@ impl ChaseSimulation {
                     // KC CAUGHT THE GHOST!
                     self.spawn_shockwave(self.ghost.x, self.ghost.y);
                     self.spawn_sparkles(self.ghost.x, self.ghost.y, Rgb::new(100, 200, 255), 18);
-                    next_phase = Phase::CatchCelebration {
-                        timer: 1.3,
-                        kc_caught_ghost: true,
-                        cx: self.ghost.x,
-                        cy: self.ghost.y,
+                    next_phase = Phase::GhostDeath {
+                        timer: 0.8,
+                        max_timer: 0.8,
+                        ghost_x: self.ghost.x,
+                        ghost_y: self.ghost.y,
                     };
                 } else if new_duration <= 0.0 {
                     // Power wearing off
@@ -550,20 +587,10 @@ impl ChaseSimulation {
                     // GHOST CAUGHT KC!
                     self.spawn_shockwave(self.kc.x, self.kc.y);
                     self.spawn_sparkles(self.kc.x, self.kc.y, Rgb::new(255, 60, 60), 20);
-                    next_phase = Phase::CatchCelebration {
-                        timer: 1.3,
-                        kc_caught_ghost: false,
-                        cx: self.kc.x,
-                        cy: self.kc.y,
-                    };
+                    next_phase = Phase::GhostCatchKc { timer: 1.2 };
                 } else if new_duration <= 0.0 {
                     // If chase goes on long without a catch, transition to new maze anyway
-                    next_phase = Phase::CatchCelebration {
-                        timer: 0.5,
-                        kc_caught_ghost: false,
-                        cx: self.kc.x,
-                        cy: self.kc.y,
-                    };
+                    next_phase = Phase::GhostCatchKc { timer: 0.5 };
                 } else {
                     next_phase = Phase::GhostChasing {
                         duration: new_duration,
@@ -571,25 +598,54 @@ impl ChaseSimulation {
                 }
             }
 
-            Phase::CatchCelebration {
+            Phase::GhostDeath {
                 timer,
-                kc_caught_ghost: _,
-                cx: _,
-                cy: _,
+                max_timer,
+                ghost_x,
+                ghost_y,
             } => {
                 let new_timer = timer - dt;
                 if new_timer <= 0.0 {
-                    // REFRESH TO A BRAND NEW RANDOM MAZE PATTERN!
-                    // This changes all walls, corners, colors, and layout to prevent screen burn!
+                    // Ghost death animation finished!
+                    // Now KC faces the camera, smiles with teeth, quickly grows arms & legs, and pumps to cheer!
+                    self.spawn_shockwave(self.kc.x, self.kc.y);
+                    self.spawn_sparkles(self.kc.x, self.kc.y, Rgb::new(255, 230, 40), 16);
+                    next_phase = Phase::KcCheer {
+                        timer: 2.2,
+                        cheer_time: 0.0,
+                    };
+                } else {
+                    next_phase = Phase::GhostDeath {
+                        timer: new_timer,
+                        max_timer,
+                        ghost_x,
+                        ghost_y,
+                    };
+                }
+            }
+
+            Phase::KcCheer { timer, cheer_time } => {
+                let new_timer = timer - dt;
+                let new_cheer_time = cheer_time + dt;
+                if new_timer <= 0.0 {
+                    // Cheer finished! Refresh maze to a brand-new layout to prevent burn-in
                     self.reset_maze_pass();
                     return;
                 } else {
-                    next_phase = Phase::CatchCelebration {
+                    next_phase = Phase::KcCheer {
                         timer: new_timer,
-                        kc_caught_ghost: true,
-                        cx: self.kc.x,
-                        cy: self.kc.y,
+                        cheer_time: new_cheer_time,
                     };
+                }
+            }
+
+            Phase::GhostCatchKc { timer } => {
+                let new_timer = timer - dt;
+                if new_timer <= 0.0 {
+                    self.reset_maze_pass();
+                    return;
+                } else {
+                    next_phase = Phase::GhostCatchKc { timer: new_timer };
                 }
             }
         }
@@ -631,73 +687,97 @@ impl ChaseSimulation {
         let radius = self.character_radius();
 
         // 5. Draw KC Munchkin
-        let is_supercharged =
-            matches!(self.phase, Phase::KcChasing { .. } | Phase::PelletChomp { .. });
-        let is_terrified = matches!(self.phase, Phase::GhostChasing { .. });
-
-        // If KC was caught during celebration, don't draw or fade KC
-        let draw_kc = match self.phase {
-            Phase::CatchCelebration {
-                kc_caught_ghost,
-                timer,
-                ..
-            } => kc_caught_ghost || (timer > 0.6),
-            _ => true,
-        };
-
-        if draw_kc {
-            draw_kc_munchkin(
-                canvas,
-                self.kc.x,
-                self.kc.y,
-                radius,
-                self.kc.dir.to_angle(),
-                self.kc_mouth,
-                is_supercharged,
-                is_terrified,
-                self.anim_time,
-            );
+        match self.phase {
+            Phase::KcCheer { cheer_time, .. } => {
+                // KC faces the camera, with a cute teeth-showing smile,
+                // quickly grows arms and legs at 45 degree angles, and pumps them to cheer!
+                let growth = (cheer_time / 0.28).min(1.0);
+                draw_kc_cheering(
+                    canvas,
+                    self.kc.x,
+                    self.kc.y,
+                    radius,
+                    growth,
+                    cheer_time,
+                    self.anim_time,
+                );
+            }
+            Phase::GhostCatchKc { timer } => {
+                if timer > 0.4 {
+                    draw_kc_munchkin(
+                        canvas,
+                        self.kc.x,
+                        self.kc.y,
+                        radius,
+                        self.kc.dir.to_angle(),
+                        self.kc_mouth,
+                        false,
+                        true,
+                        self.anim_time,
+                    );
+                }
+            }
+            _ => {
+                let is_supercharged =
+                    matches!(self.phase, Phase::KcChasing { .. } | Phase::PelletChomp { .. });
+                let is_terrified = matches!(self.phase, Phase::GhostChasing { .. });
+                draw_kc_munchkin(
+                    canvas,
+                    self.kc.x,
+                    self.kc.y,
+                    radius,
+                    self.kc.dir.to_angle(),
+                    self.kc_mouth,
+                    is_supercharged,
+                    is_terrified,
+                    self.anim_time,
+                );
+            }
         }
 
         // 6. Draw Ghost
-        let ghost_state = match self.phase {
-            Phase::ApproachingPellet => GhostState::Patrolling,
-            Phase::PelletChomp { .. } | Phase::KcChasing { .. } => GhostState::Vulnerable,
-            Phase::PowerFading { duration } => GhostState::Fading {
-                time_remaining: duration,
-            },
-            Phase::GhostChasing { .. } => GhostState::Hunting,
-            Phase::CatchCelebration {
-                kc_caught_ghost, ..
-            } => {
-                if kc_caught_ghost {
-                    GhostState::Vulnerable
-                } else {
-                    GhostState::Hunting
-                }
-            }
-        };
-
-        let draw_ghost_entity = match self.phase {
-            Phase::CatchCelebration {
-                kc_caught_ghost,
+        match self.phase {
+            Phase::GhostDeath {
                 timer,
-                ..
-            } => !kc_caught_ghost || (timer > 0.6),
-            _ => true,
-        };
-
-        if draw_ghost_entity {
-            draw_ghost(
-                canvas,
-                self.ghost.x,
-                self.ghost.y,
-                radius,
-                self.ghost.dir.to_angle(),
-                ghost_state,
-                &self.ghost_config,
-                self.anim_time,
-            );
+                max_timer,
+                ghost_x,
+                ghost_y,
+            } => {
+                let progress = (1.0 - (timer / max_timer)).clamp(0.0, 1.0);
+                draw_ghost_death(
+                    canvas,
+                    ghost_x,
+                    ghost_y,
+                    radius,
+                    progress,
+                    &self.ghost_config,
+                    self.anim_time,
+                );
+            }
+            Phase::KcCheer { .. } => {
+                // Ghost has dissolved after its death animation; KC is celebrating!
+            }
+            _ => {
+                let ghost_state = match self.phase {
+                    Phase::ApproachingPellet => GhostState::Patrolling,
+                    Phase::PelletChomp { .. } | Phase::KcChasing { .. } => GhostState::Vulnerable,
+                    Phase::PowerFading { duration } => GhostState::Fading {
+                        time_remaining: duration,
+                    },
+                    Phase::GhostChasing { .. } | Phase::GhostCatchKc { .. } => GhostState::Hunting,
+                    _ => GhostState::Patrolling,
+                };
+                draw_ghost(
+                    canvas,
+                    self.ghost.x,
+                    self.ghost.y,
+                    radius,
+                    self.ghost.dir.to_angle(),
+                    ghost_state,
+                    &self.ghost_config,
+                    self.anim_time,
+                );
+            }
         }
     }
 
@@ -884,6 +964,92 @@ mod tests {
                     ghost_row
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_kc_catch_sequence_ghost_death_then_cheer() {
+        let mut sim = ChaseSimulation::new(100, 50);
+
+        // Put simulation into KcChasing mode
+        sim.phase = Phase::KcChasing { duration: 10.0 };
+
+        // Position KC right next to Ghost so KC catches Ghost
+        sim.kc.col = sim.ghost.col;
+        sim.kc.row = sim.ghost.row;
+        sim.kc.x = sim.ghost.x;
+        sim.kc.y = sim.ghost.y;
+
+        // Step one frame: catch should trigger GhostDeath!
+        sim.update(0.02);
+        assert!(
+            matches!(sim.phase, Phase::GhostDeath { .. }),
+            "Expected GhostDeath phase after catch, got {:?}",
+            sim.phase
+        );
+
+        // Advance through the ghost death animation (~0.8s)
+        for _ in 0..45 {
+            sim.update(0.02);
+        }
+
+        // Now it must be in KcCheer phase!
+        assert!(
+            matches!(sim.phase, Phase::KcCheer { .. }),
+            "Expected KcCheer phase after GhostDeath, got {:?}",
+            sim.phase
+        );
+
+        // Advance through cheer phase (~2.2s)
+        let initial_pass = sim.pass_count;
+        for _ in 0..120 {
+            sim.update(0.02);
+        }
+
+        // After cheer, maze should have refreshed to a brand new pass
+        assert_eq!(
+            sim.pass_count,
+            initial_pass + 1,
+            "Expected maze pass count to increment after cheer"
+        );
+    }
+
+    #[test]
+    fn test_50_mazes_always_fully_connected() {
+        for _ in 0..50 {
+            let sim = ChaseSimulation::new(120, 60);
+
+            // Verify KC can reach the Super Pellet
+            let path_to_sp = sim.maze.bfs_next_direction(
+                sim.kc.col,
+                sim.kc.row,
+                sim.super_pellet_col,
+                sim.super_pellet_row,
+            );
+            assert!(
+                path_to_sp.is_some(),
+                "KC at ({}, {}) cannot reach Super Pellet at ({}, {})!",
+                sim.kc.col,
+                sim.kc.row,
+                sim.super_pellet_col,
+                sim.super_pellet_row
+            );
+
+            // Verify KC can reach Ghost
+            let path_to_ghost = sim.maze.bfs_next_direction(
+                sim.kc.col,
+                sim.kc.row,
+                sim.ghost.col,
+                sim.ghost.row,
+            );
+            assert!(
+                path_to_ghost.is_some(),
+                "KC at ({}, {}) cannot reach Ghost at ({}, {})!",
+                sim.kc.col,
+                sim.kc.row,
+                sim.ghost.col,
+                sim.ghost.row
+            );
         }
     }
 }

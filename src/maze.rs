@@ -130,13 +130,16 @@ impl Maze {
             for nx in 0..num_nodes_x {
                 let c = 1 + nx * 2;
                 let r = 1 + ny * 2;
+                let u = ny * num_nodes_x + nx;
                 // Horizontal edge to right
-                if c + 2 < cols - 1 {
-                    edges.push((c, r, c + 1, r, c + 2, r));
+                if nx + 1 < num_nodes_x {
+                    let v = ny * num_nodes_x + (nx + 1);
+                    edges.push((c, r, c + 1, r, c + 2, r, u, v));
                 }
                 // Vertical edge down
-                if r + 2 < rows - 1 {
-                    edges.push((c, r, c, r + 1, c, r + 2));
+                if ny + 1 < num_nodes_y {
+                    let v = (ny + 1) * num_nodes_x + nx;
+                    edges.push((c, r, c, r + 1, c, r + 2, u, v));
                 }
             }
         }
@@ -147,13 +150,26 @@ impl Maze {
             edges.swap(i, j);
         }
 
-        // Carve edges ensuring connectivity
-        for (c1, r1, mid_c, mid_r, _c2, _r2) in edges {
-            // Also occasionally add cycles (arcade mazes have loops, not strict trees!)
-            let should_carve = rng.random_bool(0.72);
-            if should_carve {
+        // Use Union-Find (Kruskal's algorithm) to guarantee 100% connectivity of all corridor nodes!
+        let mut uf = UnionFind::new(num_nodes_x * num_nodes_y);
+        let mut extra_edges = Vec::new();
+
+        for (c1, r1, mid_c_edge, mid_r_edge, c2, r2, u, v) in edges {
+            if uf.union(u, v) {
                 tiles[r1 * cols + c1] = Tile::Path;
-                tiles[mid_r * cols + mid_c] = Tile::Path;
+                tiles[mid_r_edge * cols + mid_c_edge] = Tile::Path;
+                tiles[r2 * cols + c2] = Tile::Path;
+            } else {
+                extra_edges.push((c1, r1, mid_c_edge, mid_r_edge, c2, r2));
+            }
+        }
+
+        // Add loops and arcade cycles from extra edges (35% probability)
+        for (c1, r1, mid_c_edge, mid_r_edge, c2, r2) in extra_edges {
+            if rng.random_bool(0.35) {
+                tiles[r1 * cols + c1] = Tile::Path;
+                tiles[mid_r_edge * cols + mid_c_edge] = Tile::Path;
+                tiles[r2 * cols + c2] = Tile::Path;
             }
         }
 
@@ -187,7 +203,7 @@ impl Maze {
         }
 
         // Add side warp tunnels on a middle row!
-        // Make sure warp row is an odd index or middle row so it connects cleanly
+        // Make sure warp row is an odd index so it connects directly to node grid
         let mut warp_row = rows / 2;
         if warp_row % 2 == 0 {
             warp_row = (warp_row + 1).min(rows - 2);
@@ -226,12 +242,6 @@ impl Maze {
 
         // Ensure overall connectivity using flood fill from center
         ensure_connected(&mut tiles, cols, rows, mid_c, cr);
-
-        // Re-confirm warp tunnel openings are paths
-        tiles[warp_row * cols + 0] = Tile::Path;
-        tiles[warp_row * cols + 1] = Tile::Path;
-        tiles[warp_row * cols + (cols - 2)] = Tile::Path;
-        tiles[warp_row * cols + (cols - 1)] = Tile::Path;
 
         Maze {
             cols,
@@ -467,6 +477,40 @@ impl Maze {
     }
 }
 
+/// Helper Disjoint-Set / Union-Find structure for Kruskal's maze generation
+struct UnionFind {
+    parent: Vec<usize>,
+}
+
+impl UnionFind {
+    fn new(n: usize) -> Self {
+        UnionFind {
+            parent: (0..n).collect(),
+        }
+    }
+
+    fn find(&mut self, i: usize) -> usize {
+        if self.parent[i] == i {
+            i
+        } else {
+            let p = self.parent[i];
+            self.parent[i] = self.find(p);
+            self.parent[i]
+        }
+    }
+
+    fn union(&mut self, i: usize, j: usize) -> bool {
+        let root_i = self.find(i);
+        let root_j = self.find(j);
+        if root_i != root_j {
+            self.parent[root_i] = root_j;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Helper to ensure all path tiles are connected to the central chamber
 fn ensure_connected(tiles: &mut [Tile], cols: usize, rows: usize, start_c: usize, start_r: usize) {
     let total = cols * rows;
@@ -491,12 +535,11 @@ fn ensure_connected(tiles: &mut [Tile], cols: usize, rows: usize, start_c: usize
         }
     }
 
-    // Connect any unvisited paths to the main component
-    for r in 1..rows - 1 {
-        for c in 1..cols - 1 {
+    // Every single path tile that was NOT visited by flood fill MUST be turned into a Wall!
+    for r in 0..rows {
+        for c in 0..cols {
             let idx = r * cols + c;
             if tiles[idx] == Tile::Path && !visited[idx] {
-                // Turn into wall or tunnel to neighbor
                 tiles[idx] = Tile::Wall;
             }
         }

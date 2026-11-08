@@ -6,16 +6,21 @@ A high-resolution retro terminal screensaver inspired by the classic Magnavox Od
 
 - **Anti-Burn-In Procedural Arcade Mazes**:
   - Replaces all static borders and corners with **randomized Pac-Man / Odyssey² style mazes** featuring symmetrical corridors, wall blocks, T-junctions, and edge warp tunnels.
+  - Generates corridors with guaranteed 100% graph connectivity (using Kruskal's spanning tree with Union-Find and reachable flood-filling). K.C., the ghost, and the super pellet are mathematically guaranteed to be in the same mutually reachable maze component.
   - Characters navigate strictly through the open corridors and turns using BFS pathfinding.
-  - **Dynamic Maze Refresh**: As soon as one character catches the other (K.C. chomps the vulnerable ghost, or the hunting ghost catches K.C.), the maze explodes in celebratory retro arcade particles and **immediately regenerates a completely new random maze pattern** with new wall layouts, glowing neon colors, character sizes, and pellet routes. This guarantees no static pixels linger on screen.
-- **Iconic Odyssey² Animation Cycle**:
+  - **Dynamic Maze Refresh**: As soon as one character catches the other, the maze immediately regenerates a completely new random maze pattern with new wall layouts, glowing neon colors, character sizes, and pellet routes. This guarantees no static pixels linger on screen.
+- **Iconic Odyssey² Animation Cycle & Catch Celebration**:
   1. K.C. Munchkin navigates corridors toward a pulsing **Super Pellet**, chomping normal pellets along the way.
   2. Chomping the Super Pellet triggers an expanding shockwave; K.C. gains an energized aura while the Muncher ghost turns frightened blue and flees through maze corners.
   3. K.C. aggressively chases the ghost through the corridors.
   4. The power effect fades with the ghost flashing warning colors.
   5. The ghost reverts to its normal color, turns around, and actively hunts K.C. through the maze.
   6. K.C. flees in terror with wide eyes and flying sweat drops.
-  7. When either character catches the other, the map refreshes into a fresh random maze!
+  7. **When K.C. catches the ghost**:
+     - The ghost's death animation plays first as it spins, shrinks, and dissolves into floating spirit bubbles and sparkles.
+     - K.C. immediately turns to face the "camera", showing an adorable toothy smile with cute pink blush cheeks!
+     - K.C. quickly grows arms and legs at 45° angles and excitedly pumps them up and down, bouncing with joy to cheer!
+     - The maze then explodes into confetti and refreshes into a fresh random maze pattern!
 - **High-Resolution ANSI Block Graphics**:
   - Uses Unicode quadrant (`▘▝▖▗▌▐▞▚▛▜▙▟█`) and half-block (`▀▄`) sub-pixels to render 2×2 virtual pixels per terminal character cell.
   - Smooth antialiased procedural sprites for K.C.'s horns, chomping mouth, animated eyes, and the ghost's wavy skirt ripples.
