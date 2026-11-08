@@ -60,6 +60,43 @@ impl Direction {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct GhostCage {
+    pub center_c: usize,
+    pub center_r: usize,
+    pub door_dir: Direction,
+    pub door_timer: f32,
+    pub door_interval: f32,
+}
+
+impl GhostCage {
+    pub fn new(center_c: usize, center_r: usize) -> Self {
+        GhostCage {
+            center_c,
+            center_r,
+            door_dir: Direction::Up,
+            door_timer: 0.0,
+            door_interval: 1.5, // Rotates clockwise once every 1.5 seconds
+        }
+    }
+
+    pub fn door_tile(&self, dir: Direction) -> (usize, usize) {
+        let dc = dir.dx();
+        let dr = dir.dy();
+        ((self.center_c as i32 + dc) as usize, (self.center_r as i32 + dr) as usize)
+    }
+
+    pub fn is_inside(&self, c: i32, r: i32) -> bool {
+        c == self.center_c as i32 && r == self.center_r as i32
+    }
+
+    pub fn is_cage_tile(&self, c: i32, r: i32) -> bool {
+        let dc = (c - self.center_c as i32).abs();
+        let dr = (r - self.center_r as i32).abs();
+        dc <= 1 && dr <= 1
+    }
+}
+
 pub struct Maze {
     pub cols: usize,
     pub rows: usize,
@@ -71,6 +108,7 @@ pub struct Maze {
     pub wall_color: Rgb,
     pub wall_glow: Rgb,
     pub warp_row: Option<usize>,
+    pub cage: GhostCage,
 }
 
 impl Maze {
@@ -183,6 +221,7 @@ impl Maze {
 
         // Open center vertical column connections
         let mid_c = cols / 2;
+        let cr = rows / 2;
         for r in (1..rows - 1).step_by(2) {
             tiles[r * cols + mid_c] = Tile::Path;
             if rng.random_bool(0.6) && r + 1 < rows - 1 {
@@ -190,16 +229,49 @@ impl Maze {
             }
         }
 
-        // Clear a central chamber or hub
-        let cr = rows / 2;
-        for dr in -1..=1 {
-            for dc in -1..=1 {
-                let r = (cr as i32 + dr) as usize;
-                let c = (mid_c as i32 + dc) as usize;
-                if r > 0 && r < rows - 1 && c > 0 && c < cols - 1 {
-                    tiles[r * cols + c] = Tile::Path;
-                }
-            }
+        // Central Ghost Cage (3x3 enclosure at maze center with rotating clockwise door)
+        let cage = GhostCage::new(mid_c, cr);
+
+        // 1. Interior cage path
+        tiles[cr * cols + mid_c] = Tile::Path;
+
+        // 2. Cage walls and initial door
+        // 4 corners of the 3x3 cage are Walls
+        tiles[(cr - 1) * cols + (mid_c - 1)] = Tile::Wall;
+        tiles[(cr - 1) * cols + (mid_c + 1)] = Tile::Wall;
+        tiles[(cr + 1) * cols + (mid_c - 1)] = Tile::Wall;
+        tiles[(cr + 1) * cols + (mid_c + 1)] = Tile::Wall;
+
+        // Initial door facing Up: Up door is Path, others are Wall
+        tiles[(cr - 1) * cols + mid_c] = Tile::Path;
+        tiles[cr * cols + (mid_c + 1)] = Tile::Wall;
+        tiles[(cr + 1) * cols + mid_c] = Tile::Wall;
+        tiles[cr * cols + (mid_c - 1)] = Tile::Wall;
+
+        // 3. Perimeter corridor loop surrounding the 3x3 cage at distance 2
+        for dc in -2..=2 {
+            let c = (mid_c as i32 + dc) as usize;
+            tiles[(cr - 2) * cols + c] = Tile::Path;
+            tiles[(cr + 2) * cols + c] = Tile::Path;
+        }
+        for dr in -2..=2 {
+            let r = (cr as i32 + dr) as usize;
+            tiles[r * cols + (mid_c - 2)] = Tile::Path;
+            tiles[r * cols + (mid_c + 2)] = Tile::Path;
+        }
+
+        // 4. Outward corridor connections from the perimeter ring
+        if cr >= 4 {
+            tiles[(cr - 3) * cols + mid_c] = Tile::Path;
+        }
+        if cr + 4 < rows {
+            tiles[(cr + 3) * cols + mid_c] = Tile::Path;
+        }
+        if mid_c >= 4 {
+            tiles[cr * cols + (mid_c - 3)] = Tile::Path;
+        }
+        if mid_c + 4 < cols {
+            tiles[cr * cols + (mid_c + 3)] = Tile::Path;
         }
 
         // Add side warp tunnels on a middle row!
@@ -254,6 +326,7 @@ impl Maze {
             wall_color,
             wall_glow,
             warp_row: Some(warp_row),
+            cage,
         }
     }
 
@@ -434,6 +507,34 @@ impl Maze {
         }
 
         best_dir
+    }
+
+    pub fn update_cage_door(&mut self, dt: f32, blocked: &[(i32, i32)]) {
+        self.cage.door_timer += dt;
+        if self.cage.door_timer >= self.cage.door_interval {
+            let old_dir = self.cage.door_dir;
+            let (old_c, old_r) = self.cage.door_tile(old_dir);
+
+            // Don't close the door if an entity is currently inside the doorway
+            let occupied = blocked.contains(&(old_c as i32, old_r as i32));
+
+            if !occupied {
+                self.cage.door_timer -= self.cage.door_interval;
+                let new_dir = match old_dir {
+                    Direction::Up => Direction::Right,
+                    Direction::Right => Direction::Down,
+                    Direction::Down => Direction::Left,
+                    Direction::Left => Direction::Up,
+                };
+                let (new_c, new_r) = self.cage.door_tile(new_dir);
+
+                // Close previous door
+                self.tiles[old_r * self.cols + old_c] = Tile::Wall;
+                // Open new door
+                self.tiles[new_r * self.cols + new_c] = Tile::Path;
+                self.cage.door_dir = new_dir;
+            }
+        }
     }
 
     /// Draw the maze walls with neon arcade borders onto the canvas

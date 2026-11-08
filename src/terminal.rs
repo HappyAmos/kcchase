@@ -15,10 +15,11 @@ use std::time::{Duration, Instant};
 /// RAII Guard that ensures the terminal is cleanly restored on drop or panic.
 pub struct TerminalGuard {
     active: Arc<AtomicBool>,
+    capture_mouse: bool,
 }
 
 impl TerminalGuard {
-    pub fn enter() -> io::Result<Self> {
+    pub fn enter(capture_mouse: bool) -> io::Result<Self> {
         let active = Arc::new(AtomicBool::new(true));
         let active_clone = Arc::clone(&active);
 
@@ -28,24 +29,39 @@ impl TerminalGuard {
             if active_clone.swap(false, Ordering::SeqCst) {
                 let _ = write!(io::stdout(), "\x1b[?7h"); // Re-enable autowrap
                 let _ = disable_raw_mode();
-                let _ = execute!(
-                    io::stdout(),
-                    LeaveAlternateScreen,
-                    DisableMouseCapture,
-                    Show
-                );
+                if capture_mouse {
+                    let _ = execute!(
+                        io::stdout(),
+                        LeaveAlternateScreen,
+                        DisableMouseCapture,
+                        Show
+                    );
+                } else {
+                    let _ = execute!(
+                        io::stdout(),
+                        LeaveAlternateScreen,
+                        Show
+                    );
+                }
             }
             default_hook(info);
         }));
 
         enable_raw_mode()?;
         let mut out = stdout();
-        execute!(out, EnterAlternateScreen, EnableMouseCapture, Hide)?;
+        if capture_mouse {
+            execute!(out, EnterAlternateScreen, EnableMouseCapture, Hide)?;
+        } else {
+            execute!(out, EnterAlternateScreen, Hide)?;
+        }
         // Disable autowrap so full-width rows and bottom-right corner never trigger extra line wraps or scrolling
         write!(out, "\x1b[?7l")?;
         out.flush()?;
 
-        Ok(TerminalGuard { active })
+        Ok(TerminalGuard {
+            active,
+            capture_mouse,
+        })
     }
 }
 
@@ -54,12 +70,20 @@ impl Drop for TerminalGuard {
         if self.active.swap(false, Ordering::SeqCst) {
             let _ = write!(io::stdout(), "\x1b[?7h"); // Re-enable autowrap
             let _ = disable_raw_mode();
-            let _ = execute!(
-                io::stdout(),
-                LeaveAlternateScreen,
-                DisableMouseCapture,
-                Show
-            );
+            if self.capture_mouse {
+                let _ = execute!(
+                    io::stdout(),
+                    LeaveAlternateScreen,
+                    DisableMouseCapture,
+                    Show
+                );
+            } else {
+                let _ = execute!(
+                    io::stdout(),
+                    LeaveAlternateScreen,
+                    Show
+                );
+            }
             let _ = io::stdout().flush();
         }
     }
@@ -68,19 +92,44 @@ impl Drop for TerminalGuard {
 pub struct InputWatcher {
     start_time: Instant,
     initial_mouse_pos: Option<(u16, u16)>,
+    exit_on_keyboard: bool,
+    exit_on_mouse: bool,
 }
 
 impl InputWatcher {
-    pub fn new() -> Self {
+    pub fn new(exit_on_keyboard: bool, exit_on_mouse: bool) -> Self {
         InputWatcher {
             start_time: Instant::now(),
             initial_mouse_pos: None,
+            exit_on_keyboard,
+            exit_on_mouse,
         }
     }
 
+    pub fn handle_key_event(&self, key_event: event::KeyEvent) -> PollResult {
+        // If keyboard exit is enabled, any key press exits the screensaver
+        if self.exit_on_keyboard {
+            return PollResult::Exit(format!("Key {:?} pressed", key_event.code));
+        }
+
+        // Even when general keyboard exit is disabled (e.g. --mouse),
+        // allow emergency fail-safes (Ctrl+C, Esc) to exit safely.
+        if key_event.modifiers.contains(event::KeyModifiers::CONTROL)
+            && matches!(key_event.code, event::KeyCode::Char('c') | event::KeyCode::Char('C'))
+        {
+            return PollResult::Exit("Ctrl+C pressed".into());
+        }
+        if key_event.code == event::KeyCode::Esc {
+            return PollResult::Exit("Escape pressed".into());
+        }
+
+        PollResult::Ignored
+    }
+
     /// Check for input events. Returns:
-    /// - Ok(Some(true)) if an exit trigger occurred (key press or mouse move)
-    /// - Ok(Some(false)) if a non-exit event occurred (e.g. terminal resize)
+    /// - Ok(Some(PollResult::Exit(...))) if an exit trigger occurred
+    /// - Ok(Some(PollResult::Resize(...))) if a terminal resize occurred
+    /// - Ok(Some(PollResult::Ignored)) if an event was handled/ignored
     /// - Ok(None) if no event occurred within timeout
     pub fn poll_event(&mut self, timeout: Duration) -> io::Result<Option<PollResult>> {
         if !event::poll(timeout)? {
@@ -88,14 +137,12 @@ impl InputWatcher {
         }
 
         match event::read()? {
-            Event::Key(key_event) => {
-                // Any key press exits the screensaver
-                Ok(Some(PollResult::Exit(format!(
-                    "Key {:?} pressed",
-                    key_event.code
-                ))))
-            }
+            Event::Key(key_event) => Ok(Some(self.handle_key_event(key_event))),
             Event::Mouse(mouse_event) => {
+                if !self.exit_on_mouse {
+                    return Ok(Some(PollResult::Ignored));
+                }
+
                 let (col, row) = (mouse_event.column, mouse_event.row);
 
                 match self.initial_mouse_pos {
@@ -155,8 +202,42 @@ impl InputWatcher {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum PollResult {
     Exit(String),
     Resize(u16, u16),
     Ignored,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    #[test]
+    fn test_input_watcher_keyboard_mode() {
+        let watcher = InputWatcher::new(true, false);
+        let normal_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
+        let space_key = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE);
+
+        assert!(matches!(watcher.handle_key_event(normal_key), PollResult::Exit(_)));
+        assert!(matches!(watcher.handle_key_event(space_key), PollResult::Exit(_)));
+    }
+
+    #[test]
+    fn test_input_watcher_mouse_only_mode_ignores_normal_keys_but_keeps_fail_safes() {
+        let watcher = InputWatcher::new(false, true);
+
+        // Regular keys should be ignored
+        let normal_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
+        let space_key = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE);
+        assert_eq!(watcher.handle_key_event(normal_key), PollResult::Ignored);
+        assert_eq!(watcher.handle_key_event(space_key), PollResult::Ignored);
+
+        // Fail-safe keys must exit
+        let ctrl_c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        let esc = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
+        assert!(matches!(watcher.handle_key_event(ctrl_c), PollResult::Exit(_)));
+        assert!(matches!(watcher.handle_key_event(esc), PollResult::Exit(_)));
+    }
 }

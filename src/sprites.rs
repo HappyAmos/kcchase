@@ -8,6 +8,8 @@ pub enum GhostState {
     Vulnerable,
     Fading { time_remaining: f32 },
     Hunting,
+    Eyes,
+    InCage { timer: f32 },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -26,14 +28,6 @@ impl GhostConfig {
         }
     }
 
-    pub fn purple_byte() -> Self {
-        GhostConfig {
-            base_color: Rgb::new(180, 50, 240),
-            eye_color: Rgb::WHITE,
-            pupil_color: Rgb::new(0, 40, 200),
-        }
-    }
-
     pub fn green_middie() -> Self {
         GhostConfig {
             base_color: Rgb::new(40, 220, 80),
@@ -42,6 +36,24 @@ impl GhostConfig {
         }
     }
 
+    pub fn yellow_byte() -> Self {
+        GhostConfig {
+            base_color: Rgb::new(255, 220, 30),
+            eye_color: Rgb::WHITE,
+            pupil_color: Rgb::new(0, 40, 200),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn purple_byte() -> Self {
+        GhostConfig {
+            base_color: Rgb::new(180, 50, 240),
+            eye_color: Rgb::WHITE,
+            pupil_color: Rgb::new(0, 40, 200),
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn orange_muncher() -> Self {
         GhostConfig {
             base_color: Rgb::new(255, 140, 20),
@@ -64,7 +76,7 @@ pub fn draw_kc_munchkin(
     is_terrified: bool,
     anim_time: f32,
 ) {
-    let kc_yellow = Rgb::new(255, 230, 20);
+    let kc_cyan = Rgb::new(0, 230, 255);
     let aura_glow = Rgb::new(255, 100, 220);
 
     // Draw glowing aura if supercharged
@@ -90,7 +102,7 @@ pub fn draw_kc_munchkin(
     let horn_color = if is_supercharged {
         Rgb::new(255, 120, 240)
     } else {
-        Rgb::new(240, 190, 10)
+        Rgb::new(0, 180, 220)
     };
 
     // Left horn
@@ -141,10 +153,10 @@ pub fn draw_kc_munchkin(
                 // Antialiased edge
                 let dist = dist2.sqrt();
                 if dist <= radius - 0.5 {
-                    canvas.set_pixel(x, y, kc_yellow);
+                    canvas.set_pixel(x, y, kc_cyan);
                 } else if dist <= radius + 0.5 {
                     let alpha = ((radius + 0.5 - dist) / 1.0).clamp(0.0, 1.0);
-                    canvas.blend_pixel(x, y, kc_yellow, alpha);
+                    canvas.blend_pixel(x, y, kc_cyan, alpha);
                 }
             }
         }
@@ -190,6 +202,37 @@ pub fn draw_kc_munchkin(
     }
 }
 
+/// Draw floating ghost eyes (used when ghost is eaten or recovering inside cage)
+pub fn draw_ghost_eyes(
+    canvas: &mut Canvas,
+    cx: f32,
+    cy: f32,
+    radius: f32,
+    direction: f32,
+    eye_color: Rgb,
+    pupil_color: Rgb,
+) {
+    let eye_spacing = radius * 0.45;
+    let eye_y = cy;
+    let eye_rx = (radius * 0.35).max(1.6);
+    let eye_ry = (radius * 0.45).max(1.9);
+
+    let left_eye_x = cx - eye_spacing;
+    let right_eye_x = cx + eye_spacing;
+
+    // Sclera
+    draw_ellipse_filled(canvas, left_eye_x, eye_y, eye_rx, eye_ry, eye_color);
+    draw_ellipse_filled(canvas, right_eye_x, eye_y, eye_rx, eye_ry, eye_color);
+
+    // Pupils
+    let p_offset_x = (direction.cos() * eye_rx * 0.5).clamp(-eye_rx * 0.5, eye_rx * 0.5);
+    let p_offset_y = (direction.sin() * eye_ry * 0.4).clamp(-eye_ry * 0.4, eye_ry * 0.4);
+    let p_rad = (eye_rx * 0.45).max(0.8);
+
+    canvas.fill_circle_smooth(left_eye_x + p_offset_x, eye_y + p_offset_y, p_rad, pupil_color);
+    canvas.fill_circle_smooth(right_eye_x + p_offset_x, eye_y + p_offset_y, p_rad, pupil_color);
+}
+
 /// Draw Ghost / Muncher at (cx, cy) with given state, animation time, direction and config.
 pub fn draw_ghost(
     canvas: &mut Canvas,
@@ -201,8 +244,27 @@ pub fn draw_ghost(
     config: &GhostConfig,
     anim_time: f32,
 ) {
+    if matches!(state, GhostState::Eyes) {
+        draw_ghost_eyes(canvas, cx, cy, radius, direction, Rgb::WHITE, Rgb::new(0, 50, 240));
+        return;
+    }
+
+    if let GhostState::InCage { timer } = state {
+        // While waiting in cage, draw eyes resting in cage
+        if timer > 0.4 {
+            draw_ghost_eyes(canvas, cx, cy, radius, direction, Rgb::WHITE, config.pupil_color);
+            return;
+        }
+        // In the final 0.4s, body flickers in to show respawning!
+        let flicker = (timer * 16.0).sin() > 0.0;
+        if flicker {
+            draw_ghost_eyes(canvas, cx, cy, radius, direction, Rgb::WHITE, config.pupil_color);
+            return;
+        }
+    }
+
     let (body_color, eye_color, pupil_color) = match state {
-        GhostState::Patrolling | GhostState::Hunting => {
+        GhostState::Patrolling | GhostState::Hunting | GhostState::InCage { .. } => {
             (config.base_color, config.eye_color, config.pupil_color)
         }
         GhostState::Vulnerable => (
@@ -220,6 +282,7 @@ pub fn draw_ghost(
                 (Rgb::new(30, 60, 220), Rgb::new(240, 240, 255), Rgb::new(255, 140, 140))
             }
         }
+        GhostState::Eyes => (Rgb::BLACK, Rgb::WHITE, Rgb::new(0, 50, 240)),
     };
 
     let height = radius * 2.1;
@@ -314,8 +377,8 @@ pub fn draw_kc_cheering(
     pump_time: f32,  // timer for pumping animation
     anim_time: f32,
 ) {
-    let kc_yellow = Rgb::new(255, 230, 20);
-    let horn_color = Rgb::new(240, 190, 10);
+    let kc_cyan = Rgb::new(0, 230, 255);
+    let horn_color = Rgb::new(0, 180, 220);
     let growth = growth.clamp(0.0, 1.0);
 
     // Bouncing hop with cheer
@@ -330,7 +393,7 @@ pub fn draw_kc_cheering(
         let star_x = cx + angle.cos() * dist;
         let star_y = body_y + angle.sin() * dist;
         let star_col = match i % 4 {
-            0 => Rgb::new(255, 230, 60),
+            0 => Rgb::new(0, 230, 255),
             1 => Rgb::new(255, 100, 220),
             2 => Rgb::new(80, 230, 255),
             _ => Rgb::WHITE,
@@ -358,9 +421,9 @@ pub fn draw_kc_cheering(
         let rax = right_arm_base_x + right_angle.cos() * arm_length;
         let ray = right_arm_base_y + right_angle.sin() * arm_length;
 
-        // Yellow arms
-        draw_line_smooth(canvas, left_arm_base_x, left_arm_base_y, lax, lay, kc_yellow, arm_thick);
-        draw_line_smooth(canvas, right_arm_base_x, right_arm_base_y, rax, ray, kc_yellow, arm_thick);
+        // Cyan arms
+        draw_line_smooth(canvas, left_arm_base_x, left_arm_base_y, lax, lay, kc_cyan, arm_thick);
+        draw_line_smooth(canvas, right_arm_base_x, right_arm_base_y, rax, ray, kc_cyan, arm_thick);
 
         // Cute white gloves / fists cheering!
         let hand_r = (radius * 0.32 * growth).max(1.1);
@@ -388,9 +451,9 @@ pub fn draw_kc_cheering(
         let rlx = right_leg_base_x + right_leg_angle.cos() * leg_length;
         let rly = right_leg_base_y + right_leg_angle.sin() * leg_length;
 
-        // Yellow legs
-        draw_line_smooth(canvas, left_leg_base_x, left_leg_base_y, llx, lly, kc_yellow, leg_thick);
-        draw_line_smooth(canvas, right_leg_base_x, right_leg_base_y, rlx, rly, kc_yellow, leg_thick);
+        // Cyan legs
+        draw_line_smooth(canvas, left_leg_base_x, left_leg_base_y, llx, lly, kc_cyan, leg_thick);
+        draw_line_smooth(canvas, right_leg_base_x, right_leg_base_y, rlx, rly, kc_cyan, leg_thick);
 
         // Cute bright red sneakers / boots!
         let foot_r = (radius * 0.34 * growth).max(1.2);
@@ -399,7 +462,7 @@ pub fn draw_kc_cheering(
     }
 
     // 3. KC Munchkin Round Body (facing camera)
-    canvas.fill_circle_smooth(cx, body_y, radius, kc_yellow);
+    canvas.fill_circle_smooth(cx, body_y, radius, kc_cyan);
 
     // 4. Front-facing horns / antennae (wiggling with cheer!)
     let horn_wiggle = (pump_time * 14.0).sin() * (radius * 0.15);
@@ -491,6 +554,7 @@ pub fn draw_kc_cheering(
 }
 
 /// Draw Ghost Death animation: flashing, spinning/shrinking and dissolving into floating eyes/sparkles!
+#[allow(dead_code)]
 pub fn draw_ghost_death(
     canvas: &mut Canvas,
     cx: f32,
@@ -611,5 +675,49 @@ fn draw_ellipse_filled(canvas: &mut Canvas, cx: f32, cy: f32, rx: f32, ry: f32, 
                 canvas.set_pixel(x, y, color);
             }
         }
+    }
+}
+
+/// Draw retro arcade text (3x5 bitmap font per character)
+pub fn draw_text_3x5(canvas: &mut Canvas, x0: i32, y0: i32, text: &str, color: Rgb) {
+    let mut cur_x = x0;
+    for ch in text.chars() {
+        if ch == ' ' {
+            cur_x += 3;
+            continue;
+        }
+        let glyph: [u8; 5] = match ch.to_ascii_uppercase() {
+            '0' => [0b111, 0b101, 0b101, 0b101, 0b111],
+            '1' => [0b010, 0b110, 0b010, 0b010, 0b111],
+            '2' => [0b111, 0b001, 0b111, 0b100, 0b111],
+            '3' => [0b111, 0b001, 0b111, 0b001, 0b111],
+            '4' => [0b101, 0b101, 0b111, 0b001, 0b001],
+            '5' => [0b111, 0b100, 0b111, 0b001, 0b111],
+            '6' => [0b111, 0b100, 0b111, 0b101, 0b111],
+            '7' => [0b111, 0b001, 0b010, 0b010, 0b010],
+            '8' => [0b111, 0b101, 0b111, 0b101, 0b111],
+            '9' => [0b111, 0b101, 0b111, 0b001, 0b111],
+            'S' => [0b111, 0b100, 0b111, 0b001, 0b111],
+            'C' => [0b111, 0b100, 0b100, 0b100, 0b111],
+            'O' => [0b111, 0b101, 0b101, 0b101, 0b111],
+            'R' => [0b110, 0b101, 0b110, 0b101, 0b101],
+            'E' => [0b111, 0b100, 0b110, 0b100, 0b111],
+            'H' => [0b101, 0b101, 0b111, 0b101, 0b101],
+            'I' => [0b111, 0b010, 0b010, 0b010, 0b111],
+            'G' => [0b111, 0b100, 0b101, 0b101, 0b111],
+            'P' => [0b111, 0b101, 0b111, 0b100, 0b100],
+            'L' => [0b100, 0b100, 0b100, 0b100, 0b111],
+            ':' => [0b000, 0b010, 0b000, 0b010, 0b000],
+            '+' => [0b000, 0b010, 0b111, 0b010, 0b000],
+            _ => [0b000, 0b000, 0b000, 0b000, 0b000],
+        };
+        for (row, bits) in glyph.iter().enumerate() {
+            for col in 0..3 {
+                if (bits >> (2 - col)) & 1 == 1 {
+                    canvas.set_pixel(cur_x + col, y0 + row as i32, color);
+                }
+            }
+        }
+        cur_x += 4;
     }
 }
