@@ -187,14 +187,51 @@ impl Maze {
         }
 
         // Add side warp tunnels on a middle row!
-        let warp_row = rows / 2;
+        // Make sure warp row is an odd index or middle row so it connects cleanly
+        let mut warp_row = rows / 2;
+        if warp_row % 2 == 0 {
+            warp_row = (warp_row + 1).min(rows - 2);
+        }
+
+        // Open warp passages on left and right edges
+        tiles[warp_row * cols + 0] = Tile::Path;
+        tiles[warp_row * cols + 1] = Tile::Path;
+        tiles[warp_row * cols + 2] = Tile::Path;
+
+        tiles[warp_row * cols + (cols - 3)] = Tile::Path;
+        tiles[warp_row * cols + (cols - 2)] = Tile::Path;
+        tiles[warp_row * cols + (cols - 1)] = Tile::Path;
+
+        // Connect warp tunnel vertically into the inner corridors
+        if warp_row > 1 {
+            tiles[(warp_row - 1) * cols + 1] = Tile::Path;
+            tiles[(warp_row - 1) * cols + (cols - 2)] = Tile::Path;
+        }
+        if warp_row + 2 < rows {
+            tiles[(warp_row + 1) * cols + 1] = Tile::Path;
+            tiles[(warp_row + 1) * cols + (cols - 2)] = Tile::Path;
+        }
+
+        // Seal outer border completely EXCEPT for the two warp tunnel openings
+        for r in 0..rows {
+            if r != warp_row {
+                tiles[r * cols + 0] = Tile::Wall;
+                tiles[r * cols + (cols - 1)] = Tile::Wall;
+            }
+        }
+        for c in 0..cols {
+            tiles[0 * cols + c] = Tile::Wall;
+            tiles[(rows - 1) * cols + c] = Tile::Wall;
+        }
+
+        // Ensure overall connectivity using flood fill from center
+        ensure_connected(&mut tiles, cols, rows, mid_c, cr);
+
+        // Re-confirm warp tunnel openings are paths
         tiles[warp_row * cols + 0] = Tile::Path;
         tiles[warp_row * cols + 1] = Tile::Path;
         tiles[warp_row * cols + (cols - 2)] = Tile::Path;
         tiles[warp_row * cols + (cols - 1)] = Tile::Path;
-
-        // Ensure overall connectivity using flood fill from center
-        ensure_connected(&mut tiles, cols, rows, mid_c, cr);
 
         Maze {
             cols,
@@ -211,10 +248,10 @@ impl Maze {
     }
 
     pub fn is_passable(&self, c: i32, r: i32) -> bool {
-        // Horizontal tunnel wrap
+        // Warp tunnel entrance/exit is only valid on the designated warp row
         if let Some(wr) = self.warp_row {
             if r == wr as i32 {
-                if c < 0 || c >= self.cols as i32 {
+                if c == -1 || c == self.cols as i32 {
                     return true;
                 }
             }
@@ -243,7 +280,21 @@ impl Maze {
     /// Find valid directions to move from a tile position
     pub fn available_directions(&self, c: i32, r: i32) -> Vec<Direction> {
         let mut dirs = Vec::new();
+        let warp_r = self.warp_row.map(|wr| wr as i32);
+
         for &d in &Direction::ALL {
+            // Check warp tunnel passage
+            if Some(r) == warp_r {
+                if c == 0 && d == Direction::Left {
+                    dirs.push(Direction::Left);
+                    continue;
+                }
+                if c == self.cols as i32 - 1 && d == Direction::Right {
+                    dirs.push(Direction::Right);
+                    continue;
+                }
+            }
+
             let nc = c + d.dx();
             let nr = r + d.dy();
             if self.is_passable(nc, nr) {
@@ -264,23 +315,33 @@ impl Maze {
         let mut visited = vec![false; total];
         let mut first_step = vec![None; total];
 
-        let start_idx = (sr as usize) * self.cols + (sc as usize);
-        visited[start_idx] = true;
+        let warp_r = self.warp_row.map(|wr| wr as i32);
+
+        if sc >= 0 && sc < self.cols as i32 && sr >= 0 && sr < self.rows as i32 {
+            let start_idx = (sr as usize) * self.cols + (sc as usize);
+            visited[start_idx] = true;
+        }
 
         for &d in &self.available_directions(sc, sr) {
             let mut nc = sc + d.dx();
             let nr = sr + d.dy();
-            // Handle wrap
-            if nc < 0 {
-                nc = self.cols as i32 - 1;
-            } else if nc >= self.cols as i32 {
-                nc = 0;
+
+            // Handle wrap ONLY on the designated warp row
+            if Some(sr) == warp_r {
+                if sc == 0 && d == Direction::Left {
+                    nc = self.cols as i32 - 1;
+                } else if sc == self.cols as i32 - 1 && d == Direction::Right {
+                    nc = 0;
+                }
             }
+
             if nc >= 0 && nc < self.cols as i32 && nr >= 0 && nr < self.rows as i32 {
                 let nidx = (nr as usize) * self.cols + (nc as usize);
-                visited[nidx] = true;
-                first_step[nidx] = Some(d);
-                queue.push_back((nc, nr));
+                if self.tiles[nidx] == Tile::Path {
+                    visited[nidx] = true;
+                    first_step[nidx] = Some(d);
+                    queue.push_back((nc, nr));
+                }
             }
         }
 
@@ -295,14 +356,19 @@ impl Maze {
             for &d in &self.available_directions(c, r) {
                 let mut nc = c + d.dx();
                 let nr = r + d.dy();
-                if nc < 0 {
-                    nc = self.cols as i32 - 1;
-                } else if nc >= self.cols as i32 {
-                    nc = 0;
+
+                // Handle wrap ONLY on warp row
+                if Some(r) == warp_r {
+                    if c == 0 && d == Direction::Left {
+                        nc = self.cols as i32 - 1;
+                    } else if c == self.cols as i32 - 1 && d == Direction::Right {
+                        nc = 0;
+                    }
                 }
+
                 if nc >= 0 && nc < self.cols as i32 && nr >= 0 && nr < self.rows as i32 {
                     let nidx = (nr as usize) * self.cols + (nc as usize);
-                    if !visited[nidx] {
+                    if self.tiles[nidx] == Tile::Path && !visited[nidx] {
                         visited[nidx] = true;
                         first_step[nidx] = initial_dir;
                         queue.push_back((nc, nr));
@@ -321,6 +387,8 @@ impl Maze {
             return current_dir;
         }
 
+        let warp_r = self.warp_row.map(|wr| wr as i32);
+
         // Avoid turning back directly into chaser unless dead end
         let candidates: Vec<Direction> = if available.len() > 1 {
             available.into_iter().filter(|&d| d != current_dir.opposite()).collect()
@@ -332,9 +400,21 @@ impl Maze {
         let mut max_dist = -1.0;
 
         for &d in &candidates {
-            let nc = sc + d.dx();
+            let mut nc = sc + d.dx();
             let nr = sr + d.dy();
-            let dc = nc - chaser_c;
+
+            if Some(sr) == warp_r {
+                if sc == 0 && d == Direction::Left {
+                    nc = self.cols as i32 - 1;
+                } else if sc == self.cols as i32 - 1 && d == Direction::Right {
+                    nc = 0;
+                }
+            }
+
+            let mut dc = (nc - chaser_c).abs();
+            if dc > (self.cols as i32) / 2 {
+                dc = (self.cols as i32) - dc;
+            }
             let dr = nr - chaser_r;
             let dist = (dc * dc + dr * dr) as f32;
             if dist > max_dist {

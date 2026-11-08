@@ -50,6 +50,7 @@ pub struct MazeEntity {
     pub speed: f32,
     pub target_col: i32,
     pub target_row: i32,
+    pub warping: bool,
 }
 
 impl MazeEntity {
@@ -64,35 +65,95 @@ impl MazeEntity {
             speed,
             target_col: col,
             target_row: row,
+            warping: false,
         }
     }
 
     /// Move along corridor towards next tile center. Returns true when reached a tile center.
     pub fn advance(&mut self, dt: f32, maze: &Maze) -> bool {
-        let (target_x, target_y) =
-            maze.tile_to_pixel(self.target_col as f32, self.target_row as f32);
-
+        let canvas_w = maze.cols as f32 * maze.cell_w;
+        let warp_r = maze.warp_row.unwrap_or(maze.rows / 2) as i32;
         let move_dist = self.speed * dt;
+
+        // If currently emerging from warp tunnel
+        if self.warping {
+            if self.dir == Direction::Left {
+                // Moving left from outside the right edge towards tile cols - 1
+                let (target_x, target_y) = maze.tile_to_pixel((maze.cols - 1) as f32, warp_r as f32);
+                self.x -= move_dist;
+                self.y = target_y;
+                if self.x <= target_x {
+                    self.x = target_x;
+                    self.col = maze.cols as i32 - 1;
+                    self.row = warp_r;
+                    self.target_col = self.col;
+                    self.target_row = self.row;
+                    self.warping = false;
+                    return true;
+                }
+                return false;
+            } else if self.dir == Direction::Right {
+                // Moving right from outside the left edge towards tile 0
+                let (target_x, target_y) = maze.tile_to_pixel(0.0, warp_r as f32);
+                self.x += move_dist;
+                self.y = target_y;
+                if self.x >= target_x {
+                    self.x = target_x;
+                    self.col = 0;
+                    self.row = warp_r;
+                    self.target_col = 0;
+                    self.target_row = warp_r;
+                    self.warping = false;
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // Check entering left warp tunnel: moving left from col 0
+        if self.dir == Direction::Left && self.col == 0 && self.row == warp_r && self.target_col == -1 {
+            self.x -= move_dist;
+            // When fully exited off left screen
+            if self.x <= -maze.cell_w * 0.5 {
+                // Teleport to right side!
+                self.x = canvas_w + maze.cell_w * 0.5;
+                self.col = maze.cols as i32 - 1;
+                self.row = warp_r;
+                self.target_col = maze.cols as i32 - 1;
+                self.target_row = warp_r;
+                self.warping = true;
+            }
+            return false;
+        }
+
+        // Check entering right warp tunnel: moving right from col cols - 1
+        if self.dir == Direction::Right
+            && self.col == maze.cols as i32 - 1
+            && self.row == warp_r
+            && self.target_col == maze.cols as i32
+        {
+            self.x += move_dist;
+            // When fully exited off right screen
+            if self.x >= canvas_w + maze.cell_w * 0.5 {
+                // Teleport to left side!
+                self.x = -maze.cell_w * 0.5;
+                self.col = 0;
+                self.row = warp_r;
+                self.target_col = 0;
+                self.target_row = warp_r;
+                self.warping = true;
+            }
+            return false;
+        }
+
+        // Standard movement to adjacent tile
+        let (target_x, target_y) = maze.tile_to_pixel(self.target_col as f32, self.target_row as f32);
         let dx = target_x - self.x;
         let dy = target_y - self.y;
         let dist = (dx * dx + dy * dy).sqrt();
 
-        // Check horizontal tunnel wrap
-        let canvas_w = maze.cols as f32 * maze.cell_w;
-        if self.dir == Direction::Left && self.x < 0.0 {
-            self.x += canvas_w;
-            self.col = maze.cols as i32 - 1;
-            self.target_col = self.col - 1;
-            return false;
-        } else if self.dir == Direction::Right && self.x > canvas_w {
-            self.x -= canvas_w;
-            self.col = 0;
-            self.target_col = 1;
-            return false;
-        }
-
         if dist <= move_dist || dist < 0.1 {
-            // Reached target tile center!
+            // Arrived at target tile center!
             self.x = target_x;
             self.y = target_y;
             self.col = self.target_col;
@@ -107,16 +168,25 @@ impl MazeEntity {
 
     /// Set next step direction from current tile center
     pub fn set_next_direction(&mut self, next_dir: Direction, maze: &Maze) {
+        let warp_r = maze.warp_row.unwrap_or(maze.rows / 2) as i32;
         self.dir = next_dir;
-        let mut nc = self.col + next_dir.dx();
-        let nr = self.row + next_dir.dy();
 
-        // Handle side warp tunnels
-        if nc < 0 {
-            nc = maze.cols as i32 - 1;
-        } else if nc >= maze.cols as i32 {
-            nc = 0;
+        // Check warp tunnel navigation
+        if self.row == warp_r {
+            if self.col == 0 && next_dir == Direction::Left {
+                self.target_col = -1;
+                self.target_row = warp_r;
+                return;
+            }
+            if self.col == maze.cols as i32 - 1 && next_dir == Direction::Right {
+                self.target_col = maze.cols as i32;
+                self.target_row = warp_r;
+                return;
+            }
         }
+
+        let nc = self.col + next_dir.dx();
+        let nr = self.row + next_dir.dy();
 
         if maze.is_passable(nc, nr) {
             self.target_col = nc;
@@ -382,9 +452,7 @@ impl ChaseSimulation {
                 }
 
                 // Check if KC catches the Ghost!
-                let dx = self.kc.x - self.ghost.x;
-                let dy = self.kc.y - self.ghost.y;
-                let dist = (dx * dx + dy * dy).sqrt();
+                let dist = entity_distance(&self.kc, &self.ghost, &self.maze);
                 let catch_threshold = self.character_radius() * 1.6;
 
                 if dist < catch_threshold {
@@ -475,9 +543,7 @@ impl ChaseSimulation {
                 }
 
                 // Check if Ghost catches KC!
-                let dx = self.ghost.x - self.kc.x;
-                let dy = self.ghost.y - self.kc.y;
-                let dist = (dx * dx + dy * dy).sqrt();
+                let dist = entity_distance(&self.ghost, &self.kc, &self.maze);
                 let catch_threshold = self.character_radius() * 1.6;
 
                 if dist < catch_threshold {
@@ -699,6 +765,20 @@ impl ChaseSimulation {
     }
 }
 
+fn entity_distance(e1: &MazeEntity, e2: &MazeEntity, maze: &Maze) -> f32 {
+    let canvas_w = maze.cols as f32 * maze.cell_w;
+    let warp_r = maze.warp_row.unwrap_or(maze.rows / 2) as i32;
+
+    let mut dx = (e1.x - e2.x).abs();
+    if e1.row == warp_r && e2.row == warp_r {
+        if dx > canvas_w * 0.5 {
+            dx = canvas_w - dx;
+        }
+    }
+    let dy = e1.y - e2.y;
+    (dx * dx + dy * dy).sqrt()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -715,5 +795,95 @@ mod tests {
 
         let mut canvas = Canvas::new(50, 25);
         sim.draw(&mut canvas);
+    }
+
+    #[test]
+    fn test_warp_tunnel_left_to_right() {
+        let maze = Maze::generate(100, 50);
+        let warp_r = maze.warp_row.unwrap() as i32;
+
+        let mut entity = MazeEntity::new(0, warp_r, Direction::Left, 100.0, &maze);
+        entity.set_next_direction(Direction::Left, &maze);
+
+        assert_eq!(entity.target_col, -1);
+
+        // Advance through warp tunnel
+        let mut warped = false;
+        for _ in 0..50 {
+            if entity.advance(0.02, &maze) {
+                warped = true;
+                break;
+            }
+        }
+
+        // Entity should have successfully emerged at cols - 1 on the right side!
+        assert!(warped);
+        assert_eq!(entity.col, maze.cols as i32 - 1);
+        assert_eq!(entity.row, warp_r);
+        assert_eq!(entity.dir, Direction::Left);
+    }
+
+    #[test]
+    fn test_warp_tunnel_right_to_left() {
+        let maze = Maze::generate(100, 50);
+        let warp_r = maze.warp_row.unwrap() as i32;
+        let right_col = maze.cols as i32 - 1;
+
+        let mut entity = MazeEntity::new(right_col, warp_r, Direction::Right, 100.0, &maze);
+        entity.set_next_direction(Direction::Right, &maze);
+
+        assert_eq!(entity.target_col, maze.cols as i32);
+
+        // Advance through warp tunnel
+        let mut warped = false;
+        for _ in 0..50 {
+            if entity.advance(0.02, &maze) {
+                warped = true;
+                break;
+            }
+        }
+
+        // Entity should have successfully emerged at col 0 on the left side!
+        assert!(warped);
+        assert_eq!(entity.col, 0);
+        assert_eq!(entity.row, warp_r);
+        assert_eq!(entity.dir, Direction::Right);
+    }
+
+    #[test]
+    fn test_entities_never_cross_walls() {
+        let mut sim = ChaseSimulation::new(120, 60);
+
+        for _ in 0..1000 {
+            sim.update(0.03);
+
+            // Check KC center tile
+            let kc_col = ((sim.kc.x - sim.maze.offset_x) / sim.maze.cell_w).floor() as i32;
+            let kc_row = ((sim.kc.y - sim.maze.offset_y) / sim.maze.cell_h).floor() as i32;
+
+            if !sim.kc.warping && kc_col >= 0 && kc_col < sim.maze.cols as i32 && kc_row >= 0 && kc_row < sim.maze.rows as i32 {
+                assert_eq!(
+                    sim.maze.tiles[(kc_row as usize) * sim.maze.cols + (kc_col as usize)],
+                    Tile::Path,
+                    "KC clipped into wall at tile ({}, {})!",
+                    kc_col,
+                    kc_row
+                );
+            }
+
+            // Check Ghost center tile
+            let ghost_col = ((sim.ghost.x - sim.maze.offset_x) / sim.maze.cell_w).floor() as i32;
+            let ghost_row = ((sim.ghost.y - sim.maze.offset_y) / sim.maze.cell_h).floor() as i32;
+
+            if !sim.ghost.warping && ghost_col >= 0 && ghost_col < sim.maze.cols as i32 && ghost_row >= 0 && ghost_row < sim.maze.rows as i32 {
+                assert_eq!(
+                    sim.maze.tiles[(ghost_row as usize) * sim.maze.cols + (ghost_col as usize)],
+                    Tile::Path,
+                    "Ghost clipped into wall at tile ({}, {})!",
+                    ghost_col,
+                    ghost_row
+                );
+            }
+        }
     }
 }
