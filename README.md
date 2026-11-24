@@ -1,5 +1,10 @@
 # kcchase
 
+[![Release](https://img.shields.io/github/v/release/HappyAmos/kcchase?label=Release)](https://github.com/HappyAmos/kcchase/releases/latest)
+[![Rust CI](https://github.com/HappyAmos/kcchase/actions/workflows/rust-app.yml/badge.svg)](https://github.com/HappyAmos/kcchase/actions/workflows/rust-app.yml)
+[![ShellCheck](https://github.com/HappyAmos/kcchase/actions/workflows/shellcheck-app.yml/badge.svg)](https://github.com/HappyAmos/kcchase/actions/workflows/shellcheck-app.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A high-resolution retro terminal screensaver inspired by the classic 
 Magnavox Odyssey² / Philips Videopac game **K.C. Munchkin!** (1981).
 Pretty much a screensaver game that plays itself. Includes cut-
@@ -141,6 +146,28 @@ Terminal Color Capability Detection:
 Available Modes: truecolor (24-bit), 256 (8-bit), 16 (4-bit), 8 (3-bit)
 ```
 
+## Development & Testing
+
+Run the unified local verification suite (matching GitHub Actions CI):
+
+```bash
+make check
+```
+
+Individual targets are also available: `make fmt`, `make lint`, and `make test`.
+
+## Translations
+
+`kcchase` uses single-file locale definitions under [`locales/`](locales/) (canonical base: [`locales/en_us.yml`](locales/en_us.yml)). See [TRANSLATIONS.md](TRANSLATIONS.md) for instructions on adding or updating a translation.
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md) before opening a pull request.
+
+## Security
+
+To report a security vulnerability privately, please see [SECURITY.md](SECURITY.md).
+
 ## License
 
-MIT
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.

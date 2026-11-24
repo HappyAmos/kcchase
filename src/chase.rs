@@ -2,8 +2,8 @@ use crate::canvas::Canvas;
 use crate::color::Rgb;
 use crate::maze::{Direction, Maze, Tile};
 use crate::sprites::{
-    draw_ghost, draw_kc_cheering, draw_kc_munchkin, draw_pellet,
-    draw_super_pellet, draw_text_3x5, GhostConfig, GhostState,
+    GhostConfig, GhostState, draw_ghost, draw_kc_cheering, draw_kc_munchkin, draw_pellet,
+    draw_super_pellet, draw_text_3x5,
 };
 use rand::RngExt;
 use std::f32::consts::PI;
@@ -30,14 +30,9 @@ pub enum Phase {
     },
     /// Immediately after ghost death: KC faces the camera with a cute toothy smile,
     /// quickly grows arms and legs at 45 degree angles, and pumps them to cheer!
-    KcCheer {
-        timer: f32,
-        cheer_time: f32,
-    },
+    KcCheer { timer: f32, cheer_time: f32 },
     /// Ghost caught KC: defeat effect before maze refresh
-    GhostCatchKc {
-        timer: f32,
-    },
+    GhostCatchKc { timer: f32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -190,13 +185,50 @@ impl IntermissionState {
                 let kc_x = self.progress_x - 3.6 * d;
 
                 // Ghosts in vulnerable scared blue state running to the right
-                draw_ghost(canvas, g0_x, self.current_y, radius, 0.0, GhostState::Vulnerable, &ghost_configs[0], anim_time);
-                draw_ghost(canvas, g1_x, self.current_y, radius, 0.0, GhostState::Vulnerable, &ghost_configs[1], anim_time);
-                draw_ghost(canvas, g2_x, self.current_y, radius, 0.0, GhostState::Vulnerable, &ghost_configs[2], anim_time);
+                draw_ghost(
+                    canvas,
+                    g0_x,
+                    self.current_y,
+                    radius,
+                    0.0,
+                    GhostState::Vulnerable,
+                    &ghost_configs[0],
+                    anim_time,
+                );
+                draw_ghost(
+                    canvas,
+                    g1_x,
+                    self.current_y,
+                    radius,
+                    0.0,
+                    GhostState::Vulnerable,
+                    &ghost_configs[1],
+                    anim_time,
+                );
+                draw_ghost(
+                    canvas,
+                    g2_x,
+                    self.current_y,
+                    radius,
+                    0.0,
+                    GhostState::Vulnerable,
+                    &ghost_configs[2],
+                    anim_time,
+                );
 
                 // KC in supercharged mode with magenta aura chasing to the right
                 let mouth_open = ((anim_time * 18.0).sin() + 1.0) * 0.5;
-                draw_kc_munchkin(canvas, kc_x, self.current_y, radius, 0.0, mouth_open, true, false, anim_time);
+                draw_kc_munchkin(
+                    canvas,
+                    kc_x,
+                    self.current_y,
+                    radius,
+                    0.0,
+                    mouth_open,
+                    true,
+                    false,
+                    anim_time,
+                );
             }
             IntermissionPhase::GhostsChasingKc => {
                 // Moving Right to Left:
@@ -208,12 +240,49 @@ impl IntermissionState {
 
                 // KC running terrified to the left
                 let mouth_open = ((anim_time * 22.0).sin() + 1.0) * 0.5;
-                draw_kc_munchkin(canvas, kc_x, self.current_y, radius, PI, mouth_open, false, true, anim_time);
+                draw_kc_munchkin(
+                    canvas,
+                    kc_x,
+                    self.current_y,
+                    radius,
+                    PI,
+                    mouth_open,
+                    false,
+                    true,
+                    anim_time,
+                );
 
                 // Ghosts in hunting mode with distinct colors chasing to the left
-                draw_ghost(canvas, g0_x, self.current_y, radius, PI, GhostState::Hunting, &ghost_configs[0], anim_time);
-                draw_ghost(canvas, g1_x, self.current_y, radius, PI, GhostState::Hunting, &ghost_configs[1], anim_time);
-                draw_ghost(canvas, g2_x, self.current_y, radius, PI, GhostState::Hunting, &ghost_configs[2], anim_time);
+                draw_ghost(
+                    canvas,
+                    g0_x,
+                    self.current_y,
+                    radius,
+                    PI,
+                    GhostState::Hunting,
+                    &ghost_configs[0],
+                    anim_time,
+                );
+                draw_ghost(
+                    canvas,
+                    g1_x,
+                    self.current_y,
+                    radius,
+                    PI,
+                    GhostState::Hunting,
+                    &ghost_configs[1],
+                    anim_time,
+                );
+                draw_ghost(
+                    canvas,
+                    g2_x,
+                    self.current_y,
+                    radius,
+                    PI,
+                    GhostState::Hunting,
+                    &ghost_configs[2],
+                    anim_time,
+                );
             }
         }
     }
@@ -276,7 +345,8 @@ impl MazeEntity {
         if self.warping {
             if self.dir == Direction::Left {
                 // Moving left from outside the right edge towards tile cols - 1
-                let (target_x, target_y) = maze.tile_to_pixel((maze.cols - 1) as f32, warp_r as f32);
+                let (target_x, target_y) =
+                    maze.tile_to_pixel((maze.cols - 1) as f32, warp_r as f32);
                 self.x -= move_dist;
                 self.y = target_y;
                 if self.x <= target_x {
@@ -308,7 +378,11 @@ impl MazeEntity {
         }
 
         // Check entering left warp tunnel: moving left from col 0
-        if self.dir == Direction::Left && self.col == 0 && self.row == warp_r && self.target_col == -1 {
+        if self.dir == Direction::Left
+            && self.col == 0
+            && self.row == warp_r
+            && self.target_col == -1
+        {
             self.x -= move_dist;
             // When fully exited off left screen
             if self.x <= -maze.cell_w * 0.5 {
@@ -344,7 +418,8 @@ impl MazeEntity {
         }
 
         // Standard movement to adjacent tile
-        let (target_x, target_y) = maze.tile_to_pixel(self.target_col as f32, self.target_row as f32);
+        let (target_x, target_y) =
+            maze.tile_to_pixel(self.target_col as f32, self.target_row as f32);
         let dx = target_x - self.x;
         let dy = target_y - self.y;
         let dist = (dx * dx + dy * dy).sqrt();
@@ -563,7 +638,11 @@ impl ChaseSimulation {
         Self::new_with_sequence(canvas_w, canvas_h, StartSequence::Game)
     }
 
-    pub fn new_with_sequence(canvas_w: usize, canvas_h: usize, start_sequence: StartSequence) -> Self {
+    pub fn new_with_sequence(
+        canvas_w: usize,
+        canvas_h: usize,
+        start_sequence: StartSequence,
+    ) -> Self {
         let maze = Maze::generate(canvas_w, canvas_h);
         let intermission = IntermissionState::new(canvas_w, canvas_h, 6);
         let sequence_mode = match start_sequence {
@@ -649,9 +728,17 @@ impl ChaseSimulation {
         type QuadrantTarget = (i32, i32, fn(i32, i32, i32, i32) -> bool);
         let corner_targets: [QuadrantTarget; 4] = [
             (1, 1, |c, r, mc, mr| c < mc && r < mr),
-            (self.maze.cols as i32 - 2, 1, |c, r, mc, mr| c > mc && r < mr),
-            (1, self.maze.rows as i32 - 2, |c, r, mc, mr| c < mc && r > mr),
-            (self.maze.cols as i32 - 2, self.maze.rows as i32 - 2, |c, r, mc, mr| c > mc && r > mr),
+            (self.maze.cols as i32 - 2, 1, |c, r, mc, mr| {
+                c > mc && r < mr
+            }),
+            (1, self.maze.rows as i32 - 2, |c, r, mc, mr| {
+                c < mc && r > mr
+            }),
+            (
+                self.maze.cols as i32 - 2,
+                self.maze.rows as i32 - 2,
+                |c, r, mc, mr| c > mc && r > mr,
+            ),
         ];
 
         let mut chosen_super = Vec::new();
@@ -662,7 +749,10 @@ impl ChaseSimulation {
             let mut best_power = None;
             let mut min_dist = i32::MAX;
             for &(pc, pr) in &path_tiles {
-                if chosen_super.contains(&(pc, pr)) || chosen_normal.contains(&(pc, pr)) || self.maze.cage.is_cage_tile(pc, pr) {
+                if chosen_super.contains(&(pc, pr))
+                    || chosen_normal.contains(&(pc, pr))
+                    || self.maze.cage.is_cage_tile(pc, pr)
+                {
                     continue;
                 }
                 if in_quadrant(pc, pr, mid_c, mid_r) {
@@ -677,7 +767,10 @@ impl ChaseSimulation {
             // Fallback if needed
             if best_power.is_none() {
                 for &(pc, pr) in &path_tiles {
-                    if chosen_super.contains(&(pc, pr)) || chosen_normal.contains(&(pc, pr)) || self.maze.cage.is_cage_tile(pc, pr) {
+                    if chosen_super.contains(&(pc, pr))
+                        || chosen_normal.contains(&(pc, pr))
+                        || self.maze.cage.is_cage_tile(pc, pr)
+                    {
                         continue;
                     }
                     let dist = (pc - tc).pow(2) + (pr - tr).pow(2);
@@ -865,7 +958,11 @@ impl ChaseSimulation {
 
     /// Find the nearest active super pellet from (from_c, from_r)
     #[allow(dead_code)]
-    pub fn nearest_active_super_pellet(&self, from_c: i32, from_r: i32) -> Option<(usize, i32, i32)> {
+    pub fn nearest_active_super_pellet(
+        &self,
+        from_c: i32,
+        from_r: i32,
+    ) -> Option<(usize, i32, i32)> {
         let mut best = None;
         let mut min_dist = i32::MAX;
 
@@ -896,7 +993,8 @@ impl ChaseSimulation {
 
         match self.sequence_mode {
             SequenceMode::Intermission => {
-                self.intermission.update(dt, self.canvas_w, self.canvas_h, self.character_radius());
+                self.intermission
+                    .update(dt, self.canvas_w, self.canvas_h, self.character_radius());
                 if self.intermission.finished {
                     self.sequence_mode = SequenceMode::Game;
                     self.levels_in_game_sequence = 0;
@@ -1025,14 +1123,28 @@ impl ChaseSimulation {
         // Move all active super pills (pathfinding around the maze)
         for sp in self.super_pellets.iter_mut() {
             if sp.active {
-                update_pill_movement(&mut sp.entity, &mut sp.col, &mut sp.row, pill_speed, dt, &self.maze);
+                update_pill_movement(
+                    &mut sp.entity,
+                    &mut sp.col,
+                    &mut sp.row,
+                    pill_speed,
+                    dt,
+                    &self.maze,
+                );
             }
         }
 
         // Move all active normal pills (pathfinding around the maze)
         for p in self.pellets.iter_mut() {
             if p.active {
-                update_pill_movement(&mut p.entity, &mut p.col, &mut p.row, pill_speed, dt, &self.maze);
+                update_pill_movement(
+                    &mut p.entity,
+                    &mut p.col,
+                    &mut p.row,
+                    pill_speed,
+                    dt,
+                    &self.maze,
+                );
             }
         }
 
@@ -1098,7 +1210,8 @@ impl ChaseSimulation {
         }
 
         // Check collision between KC and each ghost
-        let catch_threshold = (self.character_radius() * 2.2).max(self.maze.cell_w.min(self.maze.cell_h) * 0.95);
+        let catch_threshold =
+            (self.character_radius() * 2.2).max(self.maze.cell_w.min(self.maze.cell_h) * 0.95);
         let is_enhanced = matches!(
             next_phase,
             Phase::KcChasing { .. } | Phase::PowerFading { .. } | Phase::PelletChomp { .. }
@@ -1112,7 +1225,8 @@ impl ChaseSimulation {
                 GhostState::Eyes | GhostState::InCage { .. } => {}
                 GhostState::Vulnerable | GhostState::Fading { .. } => {
                     let dist = entity_distance(&self.kc, &ghost.entity, &self.maze);
-                    let same_tile = self.kc.col == ghost.entity.col && self.kc.row == ghost.entity.row;
+                    let same_tile =
+                        self.kc.col == ghost.entity.col && self.kc.row == ghost.entity.row;
                     if dist < catch_threshold || same_tile {
                         ghost.state = GhostState::Eyes;
                         eaten_ghost_events.push((ghost.entity.x, ghost.entity.y));
@@ -1120,7 +1234,8 @@ impl ChaseSimulation {
                 }
                 GhostState::Patrolling | GhostState::Hunting => {
                     let dist = entity_distance(&self.kc, &ghost.entity, &self.maze);
-                    let same_tile = self.kc.col == ghost.entity.col && self.kc.row == ghost.entity.row;
+                    let same_tile =
+                        self.kc.col == ghost.entity.col && self.kc.row == ghost.entity.row;
                     if dist < catch_threshold || same_tile {
                         ghost_caught_kc = true;
                         break;
@@ -1213,7 +1328,9 @@ impl ChaseSimulation {
                     ghost.entity.speed = ghost_speed;
                     if ghost.entity.advance(dt, &self.maze) {
                         if self.maze.cage.is_inside(ghost.entity.col, ghost.entity.row) {
-                            ghost.entity.set_next_direction(self.maze.cage.door_dir, &self.maze);
+                            ghost
+                                .entity
+                                .set_next_direction(self.maze.cage.door_dir, &self.maze);
                         } else if matches!(self.phase, Phase::GhostChasing { .. }) || idx == 0 {
                             if let Some(dir) = self.maze.bfs_next_direction(
                                 ghost.entity.col,
@@ -1240,13 +1357,11 @@ impl ChaseSimulation {
             Phase::ApproachingPellet => {
                 self.kc.speed = base_speed;
                 if self.kc.advance(dt, &self.maze)
-                    && let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row)
-                    && let Some(next_dir) = self.maze.bfs_next_direction(
-                        self.kc.col,
-                        self.kc.row,
-                        target_c,
-                        target_r,
-                    )
+                    && let Some((target_c, target_r, _)) =
+                        self.nearest_active_pill(self.kc.col, self.kc.row)
+                    && let Some(next_dir) =
+                        self.maze
+                            .bfs_next_direction(self.kc.col, self.kc.row, target_c, target_r)
                 {
                     self.kc.set_next_direction(next_dir, &self.maze);
                 }
@@ -1269,39 +1384,64 @@ impl ChaseSimulation {
                 if self.kc.advance(dt, &self.maze) {
                     // KC's first priority is always getting all the pills;
                     // getting extra points from ghosts is a secondary opportunistic goal.
-                    let nearest_pill = self.nearest_active_pill(self.kc.col, self.kc.row)
+                    let nearest_pill = self
+                        .nearest_active_pill(self.kc.col, self.kc.row)
                         .map(|(c, r, _)| (c, r));
 
-                    let nearest_vulnerable = self.ghosts
+                    let nearest_vulnerable = self
+                        .ghosts
                         .iter()
-                        .filter(|g| matches!(g.state, GhostState::Vulnerable | GhostState::Fading { .. }))
-                        .map(|g| (g, (g.entity.col - self.kc.col).abs() + (g.entity.row - self.kc.row).abs()))
+                        .filter(|g| {
+                            matches!(g.state, GhostState::Vulnerable | GhostState::Fading { .. })
+                        })
+                        .map(|g| {
+                            (
+                                g,
+                                (g.entity.col - self.kc.col).abs()
+                                    + (g.entity.row - self.kc.row).abs(),
+                            )
+                        })
                         .min_by_key(|&(_, dist)| dist);
 
                     let (target, pursued_ghost_dir) = match (nearest_pill, nearest_vulnerable) {
                         // Secondary goal: if a vulnerable ghost is closer than the nearest pill (or nearby <= 3 tiles),
                         // take the opportunistic detour to score extra points!
                         (Some((pc, pr)), Some((vg, g_dist)))
-                            if g_dist <= 3 || (g_dist <= 6 && g_dist < (pc - self.kc.col).abs() + (pr - self.kc.row).abs()) =>
+                            if g_dist <= 3
+                                || (g_dist <= 6
+                                    && g_dist
+                                        < (pc - self.kc.col).abs() + (pr - self.kc.row).abs()) =>
                         {
-                            (Some(get_ghost_target_tile(self.kc.col, self.kc.row, vg, &self.maze)), Some(vg.entity.dir))
+                            (
+                                Some(get_ghost_target_tile(
+                                    self.kc.col,
+                                    self.kc.row,
+                                    vg,
+                                    &self.maze,
+                                )),
+                                Some(vg.entity.dir),
+                            )
                         }
                         // First priority: always clear the pills!
                         (Some(pill), _) => (Some(pill), None),
                         // Fallback if no pills remain
-                        (None, Some((vg, _))) => {
-                            (Some(get_ghost_target_tile(self.kc.col, self.kc.row, vg, &self.maze)), Some(vg.entity.dir))
-                        }
+                        (None, Some((vg, _))) => (
+                            Some(get_ghost_target_tile(
+                                self.kc.col,
+                                self.kc.row,
+                                vg,
+                                &self.maze,
+                            )),
+                            Some(vg.entity.dir),
+                        ),
                         (None, None) => (None, None),
                     };
 
                     if let Some((tc, tr)) = target {
-                        if let Some(next_dir) = self.maze.bfs_next_direction(
-                            self.kc.col,
-                            self.kc.row,
-                            tc,
-                            tr,
-                        ) {
+                        if let Some(next_dir) =
+                            self.maze
+                                .bfs_next_direction(self.kc.col, self.kc.row, tc, tr)
+                        {
                             self.kc.set_next_direction(next_dir, &self.maze);
                         } else if let Some(g_dir) = pursued_ghost_dir {
                             // If already on the ghost's tile, charge forward in the ghost's direction without stalling
@@ -1314,11 +1454,15 @@ impl ChaseSimulation {
                     next_phase = Phase::PowerFading { duration: 3.5 };
                     for g in self.ghosts.iter_mut() {
                         if matches!(g.state, GhostState::Vulnerable) {
-                            g.state = GhostState::Fading { time_remaining: 3.5 };
+                            g.state = GhostState::Fading {
+                                time_remaining: 3.5,
+                            };
                         }
                     }
                 } else {
-                    next_phase = Phase::KcChasing { duration: new_duration };
+                    next_phase = Phase::KcChasing {
+                        duration: new_duration,
+                    };
                 }
             }
 
@@ -1328,39 +1472,64 @@ impl ChaseSimulation {
                 self.kc.speed = ghost_speed * 1.15;
 
                 if self.kc.advance(dt, &self.maze) {
-                    let nearest_pill = self.nearest_active_pill(self.kc.col, self.kc.row)
+                    let nearest_pill = self
+                        .nearest_active_pill(self.kc.col, self.kc.row)
                         .map(|(c, r, _)| (c, r));
 
-                    let nearest_vulnerable = self.ghosts
+                    let nearest_vulnerable = self
+                        .ghosts
                         .iter()
-                        .filter(|g| matches!(g.state, GhostState::Vulnerable | GhostState::Fading { .. }))
-                        .map(|g| (g, (g.entity.col - self.kc.col).abs() + (g.entity.row - self.kc.row).abs()))
+                        .filter(|g| {
+                            matches!(g.state, GhostState::Vulnerable | GhostState::Fading { .. })
+                        })
+                        .map(|g| {
+                            (
+                                g,
+                                (g.entity.col - self.kc.col).abs()
+                                    + (g.entity.row - self.kc.row).abs(),
+                            )
+                        })
                         .min_by_key(|&(_, dist)| dist);
 
                     let (target, pursued_ghost_dir) = match (nearest_pill, nearest_vulnerable) {
                         // Secondary goal: if a vulnerable ghost is closer than the nearest pill (or nearby <= 3 tiles),
                         // take the opportunistic detour to score extra points!
                         (Some((pc, pr)), Some((vg, g_dist)))
-                            if g_dist <= 3 || (g_dist <= 6 && g_dist < (pc - self.kc.col).abs() + (pr - self.kc.row).abs()) =>
+                            if g_dist <= 3
+                                || (g_dist <= 6
+                                    && g_dist
+                                        < (pc - self.kc.col).abs() + (pr - self.kc.row).abs()) =>
                         {
-                            (Some(get_ghost_target_tile(self.kc.col, self.kc.row, vg, &self.maze)), Some(vg.entity.dir))
+                            (
+                                Some(get_ghost_target_tile(
+                                    self.kc.col,
+                                    self.kc.row,
+                                    vg,
+                                    &self.maze,
+                                )),
+                                Some(vg.entity.dir),
+                            )
                         }
                         // First priority: always clear the pills!
                         (Some(pill), _) => (Some(pill), None),
                         // Fallback if no pills remain
-                        (None, Some((vg, _))) => {
-                            (Some(get_ghost_target_tile(self.kc.col, self.kc.row, vg, &self.maze)), Some(vg.entity.dir))
-                        }
+                        (None, Some((vg, _))) => (
+                            Some(get_ghost_target_tile(
+                                self.kc.col,
+                                self.kc.row,
+                                vg,
+                                &self.maze,
+                            )),
+                            Some(vg.entity.dir),
+                        ),
                         (None, None) => (None, None),
                     };
 
                     if let Some((tc, tr)) = target {
-                        if let Some(next_dir) = self.maze.bfs_next_direction(
-                            self.kc.col,
-                            self.kc.row,
-                            tc,
-                            tr,
-                        ) {
+                        if let Some(next_dir) =
+                            self.maze
+                                .bfs_next_direction(self.kc.col, self.kc.row, tc, tr)
+                        {
                             self.kc.set_next_direction(next_dir, &self.maze);
                         } else if let Some(g_dir) = pursued_ghost_dir {
                             self.kc.set_next_direction(g_dir, &self.maze);
@@ -1377,7 +1546,9 @@ impl ChaseSimulation {
                     }
                     next_phase = Phase::GhostChasing { duration: 12.0 };
                 } else {
-                    next_phase = Phase::PowerFading { duration: new_duration };
+                    next_phase = Phase::PowerFading {
+                        duration: new_duration,
+                    };
                 }
             }
 
@@ -1391,7 +1562,8 @@ impl ChaseSimulation {
                     let mut min_d = i32::MAX;
                     for g in &self.ghosts {
                         if matches!(g.state, GhostState::Hunting | GhostState::Patrolling) {
-                            let d = (g.entity.col - self.kc.col).abs() + (g.entity.row - self.kc.row).abs();
+                            let d = (g.entity.col - self.kc.col).abs()
+                                + (g.entity.row - self.kc.row).abs();
                             if d < min_d {
                                 min_d = d;
                                 closest_ghost = Some(&g.entity);
@@ -1409,7 +1581,8 @@ impl ChaseSimulation {
                                 self.kc.dir,
                             );
                             self.kc.set_next_direction(flee, &self.maze);
-                        } else if let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row)
+                        } else if let Some((target_c, target_r, _)) =
+                            self.nearest_active_pill(self.kc.col, self.kc.row)
                             && let Some(next_dir) = self.maze.bfs_next_direction(
                                 self.kc.col,
                                 self.kc.row,
@@ -1419,7 +1592,8 @@ impl ChaseSimulation {
                         {
                             self.kc.set_next_direction(next_dir, &self.maze);
                         }
-                    } else if let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row)
+                    } else if let Some((target_c, target_r, _)) =
+                        self.nearest_active_pill(self.kc.col, self.kc.row)
                         && let Some(next_dir) = self.maze.bfs_next_direction(
                             self.kc.col,
                             self.kc.row,
@@ -1434,11 +1608,18 @@ impl ChaseSimulation {
                 if new_duration <= 0.0 {
                     next_phase = Phase::ApproachingPellet;
                 } else {
-                    next_phase = Phase::GhostChasing { duration: new_duration };
+                    next_phase = Phase::GhostChasing {
+                        duration: new_duration,
+                    };
                 }
             }
 
-            Phase::GhostDeath { timer, max_timer, ghost_x, ghost_y } => {
+            Phase::GhostDeath {
+                timer,
+                max_timer,
+                ghost_x,
+                ghost_y,
+            } => {
                 let new_timer = timer - dt;
                 if new_timer <= 0.0 {
                     next_phase = Phase::ApproachingPellet;
@@ -1463,7 +1644,8 @@ impl ChaseSimulation {
         canvas.clear();
 
         if self.sequence_mode == SequenceMode::Intermission {
-            self.intermission.draw(canvas, self.anim_time, self.character_radius());
+            self.intermission
+                .draw(canvas, self.anim_time, self.character_radius());
             return;
         }
 
@@ -1526,8 +1708,10 @@ impl ChaseSimulation {
                 }
             }
             _ => {
-                let is_supercharged =
-                    matches!(self.phase, Phase::KcChasing { .. } | Phase::PelletChomp { .. });
+                let is_supercharged = matches!(
+                    self.phase,
+                    Phase::KcChasing { .. } | Phase::PelletChomp { .. }
+                );
                 let is_terrified = matches!(self.phase, Phase::GhostChasing { .. });
                 draw_kc_munchkin(
                     canvas,
@@ -1764,7 +1948,12 @@ mod tests {
             let kc_col = ((sim.kc.x - sim.maze.offset_x) / sim.maze.cell_w).floor() as i32;
             let kc_row = ((sim.kc.y - sim.maze.offset_y) / sim.maze.cell_h).floor() as i32;
 
-            if !sim.kc.warping && kc_col >= 0 && kc_col < sim.maze.cols as i32 && kc_row >= 0 && kc_row < sim.maze.rows as i32 {
+            if !sim.kc.warping
+                && kc_col >= 0
+                && kc_col < sim.maze.cols as i32
+                && kc_row >= 0
+                && kc_row < sim.maze.rows as i32
+            {
                 assert_eq!(
                     sim.maze.tiles[(kc_row as usize) * sim.maze.cols + (kc_col as usize)],
                     Tile::Path,
@@ -1779,7 +1968,12 @@ mod tests {
                 let ghost_col = ((g.entity.x - sim.maze.offset_x) / sim.maze.cell_w).floor() as i32;
                 let ghost_row = ((g.entity.y - sim.maze.offset_y) / sim.maze.cell_h).floor() as i32;
 
-                if !g.entity.warping && ghost_col >= 0 && ghost_col < sim.maze.cols as i32 && ghost_row >= 0 && ghost_row < sim.maze.rows as i32 {
+                if !g.entity.warping
+                    && ghost_col >= 0
+                    && ghost_col < sim.maze.cols as i32
+                    && ghost_row >= 0
+                    && ghost_row < sim.maze.rows as i32
+                {
                     assert_eq!(
                         sim.maze.tiles[(ghost_row as usize) * sim.maze.cols + (ghost_col as usize)],
                         Tile::Path,
@@ -1803,7 +1997,10 @@ mod tests {
         }
 
         // Position KC and Ghost 0 away from the cage on the perimeter ring where no pills are placed
-        let (away_c, away_r) = (sim.maze.cage.center_c as i32, sim.maze.cage.center_r as i32 - 2);
+        let (away_c, away_r) = (
+            sim.maze.cage.center_c as i32,
+            sim.maze.cage.center_r as i32 - 2,
+        );
         let (ax, ay) = sim.maze.tile_to_pixel(away_c as f32, away_r as f32);
         sim.ghosts[0].entity.col = away_c;
         sim.ghosts[0].entity.row = away_r;
@@ -1852,8 +2049,14 @@ mod tests {
         let initial_pass = sim.pass_count;
         for _ in 0..10 {
             sim.update(0.02);
-            assert_eq!(sim.ghosts[0].entity.x, cheer_g0_x, "Ghosts must pause at their coordinates during cheer");
-            assert_eq!(sim.ghosts[0].entity.y, cheer_g0_y, "Ghosts must pause at their coordinates during cheer");
+            assert_eq!(
+                sim.ghosts[0].entity.x, cheer_g0_x,
+                "Ghosts must pause at their coordinates during cheer"
+            );
+            assert_eq!(
+                sim.ghosts[0].entity.y, cheer_g0_y,
+                "Ghosts must pause at their coordinates during cheer"
+            );
         }
         while sim.pass_count == initial_pass {
             sim.update(0.02);
@@ -1866,8 +2069,7 @@ mod tests {
             "Expected maze pass count to increment after cheer"
         );
         assert_eq!(
-            sim.score,
-            cheer_score,
+            sim.score, cheer_score,
             "Score must be preserved across level advances"
         );
         assert_eq!(
@@ -1893,12 +2095,9 @@ mod tests {
             // Verify all 4 corner Super Pellets are reachable from KC
             assert_eq!(sim.super_pellets.len(), 4);
             for sp in &sim.super_pellets {
-                let path_to_sp = sim.maze.bfs_next_direction(
-                    sim.kc.col,
-                    sim.kc.row,
-                    sp.col,
-                    sp.row,
-                );
+                let path_to_sp = sim
+                    .maze
+                    .bfs_next_direction(sim.kc.col, sim.kc.row, sp.col, sp.row);
                 // Either already at tile or reachable via BFS
                 assert!(
                     (sim.kc.col == sp.col && sim.kc.row == sp.row) || path_to_sp.is_some(),
@@ -1918,7 +2117,8 @@ mod tests {
                 sim.ghosts[0].entity.row,
             );
             assert!(
-                (sim.kc.col == sim.ghosts[0].entity.col && sim.kc.row == sim.ghosts[0].entity.row) || path_to_ghost.is_some(),
+                (sim.kc.col == sim.ghosts[0].entity.col && sim.kc.row == sim.ghosts[0].entity.row)
+                    || path_to_ghost.is_some(),
                 "KC at ({}, {}) cannot reach Ghost at ({}, {})!",
                 sim.kc.col,
                 sim.kc.row,
@@ -1940,19 +2140,51 @@ mod tests {
         let mid_r = sim.maze.rows as i32 / 2;
 
         // Check each quadrant has one super pellet and two regular pellets
-        let top_left_sp = sim.super_pellets.iter().filter(|sp| sp.col < mid_c && sp.row < mid_r).count();
-        let top_right_sp = sim.super_pellets.iter().filter(|sp| sp.col > mid_c && sp.row < mid_r).count();
-        let bot_left_sp = sim.super_pellets.iter().filter(|sp| sp.col < mid_c && sp.row > mid_r).count();
-        let bot_right_sp = sim.super_pellets.iter().filter(|sp| sp.col > mid_c && sp.row > mid_r).count();
+        let top_left_sp = sim
+            .super_pellets
+            .iter()
+            .filter(|sp| sp.col < mid_c && sp.row < mid_r)
+            .count();
+        let top_right_sp = sim
+            .super_pellets
+            .iter()
+            .filter(|sp| sp.col > mid_c && sp.row < mid_r)
+            .count();
+        let bot_left_sp = sim
+            .super_pellets
+            .iter()
+            .filter(|sp| sp.col < mid_c && sp.row > mid_r)
+            .count();
+        let bot_right_sp = sim
+            .super_pellets
+            .iter()
+            .filter(|sp| sp.col > mid_c && sp.row > mid_r)
+            .count();
         assert_eq!(top_left_sp, 1);
         assert_eq!(top_right_sp, 1);
         assert_eq!(bot_left_sp, 1);
         assert_eq!(bot_right_sp, 1);
 
-        let top_left_norm = sim.pellets.iter().filter(|p| p.col < mid_c && p.row < mid_r).count();
-        let top_right_norm = sim.pellets.iter().filter(|p| p.col > mid_c && p.row < mid_r).count();
-        let bot_left_norm = sim.pellets.iter().filter(|p| p.col < mid_c && p.row > mid_r).count();
-        let bot_right_norm = sim.pellets.iter().filter(|p| p.col > mid_c && p.row > mid_r).count();
+        let top_left_norm = sim
+            .pellets
+            .iter()
+            .filter(|p| p.col < mid_c && p.row < mid_r)
+            .count();
+        let top_right_norm = sim
+            .pellets
+            .iter()
+            .filter(|p| p.col > mid_c && p.row < mid_r)
+            .count();
+        let bot_left_norm = sim
+            .pellets
+            .iter()
+            .filter(|p| p.col < mid_c && p.row > mid_r)
+            .count();
+        let bot_right_norm = sim
+            .pellets
+            .iter()
+            .filter(|p| p.col > mid_c && p.row > mid_r)
+            .count();
         assert_eq!(top_left_norm, 2);
         assert_eq!(top_right_norm, 2);
         assert_eq!(bot_left_norm, 2);
@@ -1965,7 +2197,9 @@ mod tests {
         sim.kc.row = pellet_tile.1;
         sim.kc.target_col = pellet_tile.0;
         sim.kc.target_row = pellet_tile.1;
-        let (px, py) = sim.maze.tile_to_pixel(pellet_tile.0 as f32, pellet_tile.1 as f32);
+        let (px, py) = sim
+            .maze
+            .tile_to_pixel(pellet_tile.0 as f32, pellet_tile.1 as f32);
         sim.kc.x = px;
         sim.kc.y = py;
         sim.super_pellets[0].entity.x = px;
@@ -1976,7 +2210,10 @@ mod tests {
         // Position Ghost far away so ghost catch doesn't trigger
         sim.ghosts[0].entity.col = sim.maze.cols as i32 - 2;
         sim.ghosts[0].entity.row = sim.maze.rows as i32 - 2;
-        let (gx, gy) = sim.maze.tile_to_pixel(sim.ghosts[0].entity.col as f32, sim.ghosts[0].entity.row as f32);
+        let (gx, gy) = sim.maze.tile_to_pixel(
+            sim.ghosts[0].entity.col as f32,
+            sim.ghosts[0].entity.row as f32,
+        );
         sim.ghosts[0].entity.x = gx;
         sim.ghosts[0].entity.y = gy;
 
@@ -1999,7 +2236,10 @@ mod tests {
         // Phase 1: ApproachingPellet
         sim.phase = Phase::ApproachingPellet;
         sim.update(0.01);
-        assert_eq!(sim.ghosts[0].entity.speed, expected_ghost_speed, "Ghost speed must never change in ApproachingPellet");
+        assert_eq!(
+            sim.ghosts[0].entity.speed, expected_ghost_speed,
+            "Ghost speed must never change in ApproachingPellet"
+        );
         assert_eq!(
             sim.kc.speed, sim.ghosts[0].entity.speed,
             "KC speed must be the same as ghost speed in ApproachingPellet"
@@ -2013,7 +2253,10 @@ mod tests {
         sim.ghosts[0].entity.col = 10;
         sim.ghosts[0].entity.row = 10;
         sim.update(0.01);
-        assert_eq!(sim.ghosts[0].entity.speed, expected_ghost_speed, "Ghost speed must never change in KcChasing");
+        assert_eq!(
+            sim.ghosts[0].entity.speed, expected_ghost_speed,
+            "Ghost speed must never change in KcChasing"
+        );
         assert!(
             sim.kc.speed > sim.ghosts[0].entity.speed,
             "KC must be faster than the ghost when under enhanced pill effect"
@@ -2028,7 +2271,10 @@ mod tests {
         // Phase 3: PowerFading (enhanced pill effect waning)
         sim.phase = Phase::PowerFading { duration: 3.0 };
         sim.update(0.01);
-        assert_eq!(sim.ghosts[0].entity.speed, expected_ghost_speed, "Ghost speed must never change in PowerFading");
+        assert_eq!(
+            sim.ghosts[0].entity.speed, expected_ghost_speed,
+            "Ghost speed must never change in PowerFading"
+        );
         assert!(
             sim.kc.speed > sim.ghosts[0].entity.speed,
             "KC must remain slightly faster than the ghost while power is fading"
@@ -2037,7 +2283,10 @@ mod tests {
         // Phase 4: GhostChasing (enhanced pill effect expired)
         sim.phase = Phase::GhostChasing { duration: 10.0 };
         sim.update(0.01);
-        assert_eq!(sim.ghosts[0].entity.speed, expected_ghost_speed, "Ghost speed must never change in GhostChasing");
+        assert_eq!(
+            sim.ghosts[0].entity.speed, expected_ghost_speed,
+            "Ghost speed must never change in GhostChasing"
+        );
         assert_eq!(
             sim.kc.speed, sim.ghosts[0].entity.speed,
             "KC speed must be the same as ghost speed when not under power pill"
@@ -2243,7 +2492,10 @@ mod tests {
             sim.update(0.02);
         }
         assert!(
-            matches!(sim.ghosts[0].state, GhostState::Vulnerable | GhostState::Patrolling),
+            matches!(
+                sim.ghosts[0].state,
+                GhostState::Vulnerable | GhostState::Patrolling
+            ),
             "Ghost should fully respawn after 2s in cage, got {:?}",
             sim.ghosts[0].state
         );
@@ -2318,7 +2570,10 @@ mod tests {
         // Let power pill wear off: transition to GhostChasing
         sim.phase = Phase::PowerFading { duration: 0.01 };
         sim.update(0.02);
-        assert_eq!(sim.ghosts_eaten_this_power, 0, "Counter must reset after power wears off");
+        assert_eq!(
+            sim.ghosts_eaten_this_power, 0,
+            "Counter must reset after power wears off"
+        );
 
         // Eat another super pill: next ghost should give 5 points again
         sim.super_pellets[1].active = true;
@@ -2360,7 +2615,10 @@ mod tests {
         assert_eq!(remaining, 1);
 
         // Eat a ghost while 1 pill remains: must NOT trigger victory dance!
-        let (away_c, away_r) = (sim.maze.cage.center_c as i32, sim.maze.cage.center_r as i32 - 2);
+        let (away_c, away_r) = (
+            sim.maze.cage.center_c as i32,
+            sim.maze.cage.center_r as i32 - 2,
+        );
         let (ax, ay) = sim.maze.tile_to_pixel(away_c as f32, away_r as f32);
         sim.phase = Phase::KcChasing { duration: 8.0 };
         sim.ghosts[0].state = GhostState::Vulnerable;
@@ -2377,7 +2635,10 @@ mod tests {
         assert_eq!(sim.ghosts[0].state, GhostState::Eyes);
         assert_ne!(
             sim.phase,
-            Phase::KcCheer { timer: 2.2, cheer_time: 0.0 },
+            Phase::KcCheer {
+                timer: 2.2,
+                cheer_time: 0.0
+            },
             "Eating a ghost must not trigger KcCheer"
         );
         assert!(matches!(sim.phase, Phase::KcChasing { .. }));
@@ -2440,8 +2701,14 @@ mod tests {
         // Eyes must NOT be eaten or intercepted: state remains Eyes,
         // score does not change, eaten counter does not change!
         assert_eq!(sim.ghosts[0].state, GhostState::Eyes);
-        assert_eq!(sim.score, initial_score, "Colliding with Eyes must not award points");
-        assert_eq!(sim.ghosts_eaten_this_power, initial_eaten, "Colliding with Eyes must not increment eaten counter");
+        assert_eq!(
+            sim.score, initial_score,
+            "Colliding with Eyes must not award points"
+        );
+        assert_eq!(
+            sim.ghosts_eaten_this_power, initial_eaten,
+            "Colliding with Eyes must not increment eaten counter"
+        );
 
         // Test 3: KC catches a vulnerable ghost fleeing across consecutive frames
         sim.phase = Phase::KcChasing { duration: 8.0 };
@@ -2487,7 +2754,10 @@ mod tests {
                 break;
             }
         }
-        assert!(caught, "KC must successfully catch up to and eat the fleeing vulnerable ghost!");
+        assert!(
+            caught,
+            "KC must successfully catch up to and eat the fleeing vulnerable ghost!"
+        );
     }
 
     #[test]
@@ -2517,7 +2787,11 @@ mod tests {
         // Ghost catch must trigger Phase::GhostCatchKc with 0.8s timer
         match sim.phase {
             Phase::GhostCatchKc { timer } => {
-                assert!(timer <= 0.8 && timer > 0.7, "Expected initial timer around 0.8, got {}", timer);
+                assert!(
+                    timer <= 0.8 && timer > 0.7,
+                    "Expected initial timer around 0.8, got {}",
+                    timer
+                );
             }
             ref p => panic!("Expected Phase::GhostCatchKc, got {:?}", p),
         }
@@ -2542,8 +2816,14 @@ mod tests {
             }
             ref p => panic!("Expected still in Phase::GhostCatchKc midway, got {:?}", p),
         }
-        assert_eq!(sim.ghosts[0].entity.x, frozen_gx, "Ghost should be frozen during defeat animation");
-        assert_eq!(sim.ghosts[0].entity.y, frozen_gy, "Ghost should be frozen during defeat animation");
+        assert_eq!(
+            sim.ghosts[0].entity.x, frozen_gx,
+            "Ghost should be frozen during defeat animation"
+        );
+        assert_eq!(
+            sim.ghosts[0].entity.y, frozen_gy,
+            "Ghost should be frozen during defeat animation"
+        );
 
         // Advance past remaining defeat timer (> 0.4s)
         for _ in 0..25 {
@@ -2556,9 +2836,16 @@ mod tests {
             "Expected level reset to ApproachingPellet phase, got {:?}",
             sim.phase
         );
-        assert_eq!(sim.pass_count, initial_pass + 1, "Pass count should increment after level reset");
+        assert_eq!(
+            sim.pass_count,
+            initial_pass + 1,
+            "Pass count should increment after level reset"
+        );
         assert_eq!(sim.score, 0, "Score should reset to 0 after dying");
-        assert_eq!(sim.high_score, 24, "High score should record KC's score prior to death");
+        assert_eq!(
+            sim.high_score, 24,
+            "High score should record KC's score prior to death"
+        );
     }
 
     #[test]
@@ -2654,7 +2941,10 @@ mod tests {
                 break;
             }
         }
-        assert!(caught, "KC must overtake and catch the vulnerable ghost right ahead in the corridor without stalling");
+        assert!(
+            caught,
+            "KC must overtake and catch the vulnerable ghost right ahead in the corridor without stalling"
+        );
     }
 
     #[test]
@@ -2746,13 +3036,19 @@ mod tests {
         let mut sim = ChaseSimulation::new_with_sequence(100, 50, StartSequence::Game);
 
         // Level 1 victory: K.C. won, so continue playing
-        sim.phase = Phase::KcCheer { timer: 0.01, cheer_time: 2.0 };
+        sim.phase = Phase::KcCheer {
+            timer: 0.01,
+            cheer_time: 2.0,
+        };
         sim.update(0.02);
         assert_eq!(sim.sequence_mode, SequenceMode::Game);
         assert_eq!(sim.levels_in_game_sequence, 1);
 
         // Level 2 victory: K.C. won again, winning streak continues without intermission
-        sim.phase = Phase::KcCheer { timer: 0.01, cheer_time: 2.0 };
+        sim.phase = Phase::KcCheer {
+            timer: 0.01,
+            cheer_time: 2.0,
+        };
         sim.update(0.02);
         assert_eq!(sim.sequence_mode, SequenceMode::Game);
         assert_eq!(sim.levels_in_game_sequence, 2);

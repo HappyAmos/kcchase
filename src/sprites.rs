@@ -111,7 +111,15 @@ pub fn draw_kc_munchkin(
     let ly0 = cy - radius * 0.7;
     let lx1 = cx - horn_spread * 1.35;
     let ly1 = cy - radius - horn_len;
-    draw_line_smooth(canvas, lx0, ly0, lx1, ly1, horn_color, (radius * 0.22).max(1.0));
+    draw_line_smooth(
+        canvas,
+        lx0,
+        ly0,
+        lx1,
+        ly1,
+        horn_color,
+        (radius * 0.22).max(1.0),
+    );
     canvas.fill_circle_smooth(lx1, ly1, (radius * 0.22).max(1.2), Rgb::new(255, 255, 255));
 
     // Right horn
@@ -119,7 +127,15 @@ pub fn draw_kc_munchkin(
     let ry0 = cy - radius * 0.7;
     let rx1 = cx + horn_spread * 1.35;
     let ry1 = cy - radius - horn_len;
-    draw_line_smooth(canvas, rx0, ry0, rx1, ry1, horn_color, (radius * 0.22).max(1.0));
+    draw_line_smooth(
+        canvas,
+        rx0,
+        ry0,
+        rx1,
+        ry1,
+        horn_color,
+        (radius * 0.22).max(1.0),
+    );
     canvas.fill_circle_smooth(rx1, ry1, (radius * 0.22).max(1.2), Rgb::new(255, 255, 255));
 
     // Munchkin Body: Round sphere with wedge mouth cutout
@@ -230,8 +246,18 @@ pub fn draw_ghost_eyes(
     let p_offset_y = (direction.sin() * eye_ry * 0.4).clamp(-eye_ry * 0.4, eye_ry * 0.4);
     let p_rad = (eye_rx * 0.45).max(0.8);
 
-    canvas.fill_circle_smooth(left_eye_x + p_offset_x, eye_y + p_offset_y, p_rad, pupil_color);
-    canvas.fill_circle_smooth(right_eye_x + p_offset_x, eye_y + p_offset_y, p_rad, pupil_color);
+    canvas.fill_circle_smooth(
+        left_eye_x + p_offset_x,
+        eye_y + p_offset_y,
+        p_rad,
+        pupil_color,
+    );
+    canvas.fill_circle_smooth(
+        right_eye_x + p_offset_x,
+        eye_y + p_offset_y,
+        p_rad,
+        pupil_color,
+    );
 }
 
 /// Draw Ghost / Muncher at (cx, cy) with given state, animation time, direction and config.
@@ -247,20 +273,44 @@ pub fn draw_ghost(
     anim_time: f32,
 ) {
     if matches!(state, GhostState::Eyes) {
-        draw_ghost_eyes(canvas, cx, cy, radius, direction, Rgb::WHITE, Rgb::new(0, 50, 240));
+        draw_ghost_eyes(
+            canvas,
+            cx,
+            cy,
+            radius,
+            direction,
+            Rgb::WHITE,
+            Rgb::new(0, 50, 240),
+        );
         return;
     }
 
     if let GhostState::InCage { timer } = state {
         // While waiting in cage, draw eyes resting in cage
         if timer > 0.4 {
-            draw_ghost_eyes(canvas, cx, cy, radius, direction, Rgb::WHITE, config.pupil_color);
+            draw_ghost_eyes(
+                canvas,
+                cx,
+                cy,
+                radius,
+                direction,
+                Rgb::WHITE,
+                config.pupil_color,
+            );
             return;
         }
         // In the final 0.4s, body flickers in to show respawning!
         let flicker = (timer * 16.0).sin() > 0.0;
         if flicker {
-            draw_ghost_eyes(canvas, cx, cy, radius, direction, Rgb::WHITE, config.pupil_color);
+            draw_ghost_eyes(
+                canvas,
+                cx,
+                cy,
+                radius,
+                direction,
+                Rgb::WHITE,
+                config.pupil_color,
+            );
             return;
         }
     }
@@ -279,9 +329,17 @@ pub fn draw_ghost(
             let flash_rate = 14.0;
             let flash = (anim_time * flash_rate).sin() > 0.0;
             if flash {
-                (Rgb::new(240, 240, 255), Rgb::new(255, 40, 40), Rgb::new(0, 0, 255))
+                (
+                    Rgb::new(240, 240, 255),
+                    Rgb::new(255, 40, 40),
+                    Rgb::new(0, 0, 255),
+                )
             } else {
-                (Rgb::new(30, 60, 220), Rgb::new(240, 240, 255), Rgb::new(255, 140, 140))
+                (
+                    Rgb::new(30, 60, 220),
+                    Rgb::new(240, 240, 255),
+                    Rgb::new(255, 140, 140),
+                )
             }
         }
         GhostState::Eyes => (Rgb::BLACK, Rgb::WHITE, Rgb::new(0, 50, 240)),
@@ -347,8 +405,18 @@ pub fn draw_ghost(
     let p_offset_y = (direction.sin() * eye_ry * 0.4).clamp(-eye_ry * 0.4, eye_ry * 0.4);
     let p_rad = (eye_rx * 0.45).max(0.8);
 
-    canvas.fill_circle_smooth(left_eye_x + p_offset_x, eye_y + p_offset_y, p_rad, pupil_color);
-    canvas.fill_circle_smooth(right_eye_x + p_offset_x, eye_y + p_offset_y, p_rad, pupil_color);
+    canvas.fill_circle_smooth(
+        left_eye_x + p_offset_x,
+        eye_y + p_offset_y,
+        p_rad,
+        pupil_color,
+    );
+    canvas.fill_circle_smooth(
+        right_eye_x + p_offset_x,
+        eye_y + p_offset_y,
+        p_rad,
+        pupil_color,
+    );
 
     // If vulnerable, draw classic squiggly scared mouth!
     if matches!(state, GhostState::Vulnerable | GhostState::Fading { .. }) {
@@ -361,7 +429,15 @@ pub fn draw_ghost(
             let next_x = cx - mouth_w * 0.5 + (s as f32 / segments as f32) * mouth_w;
             let dy = if s % 2 == 1 { -1.2 } else { 1.2 };
             let next_y = mouth_y + dy;
-            draw_line_smooth(canvas, prev_x, prev_y, next_x, next_y, Rgb::new(255, 180, 180), 0.8);
+            draw_line_smooth(
+                canvas,
+                prev_x,
+                prev_y,
+                next_x,
+                next_y,
+                Rgb::new(255, 180, 180),
+                0.8,
+            );
             prev_x = next_x;
             prev_y = next_y;
         }
@@ -375,8 +451,8 @@ pub fn draw_kc_cheering(
     cx: f32,
     cy: f32,
     radius: f32,
-    growth: f32,     // 0.0 to 1.0 (how far arms/legs have sprouted)
-    pump_time: f32,  // timer for pumping animation
+    growth: f32,    // 0.0 to 1.0 (how far arms/legs have sprouted)
+    pump_time: f32, // timer for pumping animation
     anim_time: f32,
 ) {
     let kc_cyan = Rgb::new(0, 230, 255);
@@ -411,7 +487,7 @@ pub fn draw_kc_cheering(
         // Pumping angle oscillation around 45 degrees
         let arm_pump = (pump_time * 14.0).sin() * 0.28;
         let left_angle = -3.0 * PI / 4.0 - arm_pump; // ~135 deg up-left
-        let right_angle = -PI / 4.0 + arm_pump;      // ~45 deg up-right
+        let right_angle = -PI / 4.0 + arm_pump; // ~45 deg up-right
 
         let left_arm_base_x = cx - radius * 0.65;
         let left_arm_base_y = body_y - radius * 0.05;
@@ -424,8 +500,24 @@ pub fn draw_kc_cheering(
         let ray = right_arm_base_y + right_angle.sin() * arm_length;
 
         // Cyan arms
-        draw_line_smooth(canvas, left_arm_base_x, left_arm_base_y, lax, lay, kc_cyan, arm_thick);
-        draw_line_smooth(canvas, right_arm_base_x, right_arm_base_y, rax, ray, kc_cyan, arm_thick);
+        draw_line_smooth(
+            canvas,
+            left_arm_base_x,
+            left_arm_base_y,
+            lax,
+            lay,
+            kc_cyan,
+            arm_thick,
+        );
+        draw_line_smooth(
+            canvas,
+            right_arm_base_x,
+            right_arm_base_y,
+            rax,
+            ray,
+            kc_cyan,
+            arm_thick,
+        );
 
         // Cute white gloves / fists cheering!
         let hand_r = (radius * 0.32 * growth).max(1.1);
@@ -441,7 +533,7 @@ pub fn draw_kc_cheering(
         // Pumping step oscillation
         let leg_pump = (pump_time * 14.0).cos() * 0.22;
         let left_leg_angle = 3.0 * PI / 4.0 + leg_pump; // ~135 deg down-left
-        let right_leg_angle = PI / 4.0 - leg_pump;      // ~45 deg down-right
+        let right_leg_angle = PI / 4.0 - leg_pump; // ~45 deg down-right
 
         let left_leg_base_x = cx - radius * 0.45;
         let left_leg_base_y = body_y + radius * 0.65;
@@ -454,8 +546,24 @@ pub fn draw_kc_cheering(
         let rly = right_leg_base_y + right_leg_angle.sin() * leg_length;
 
         // Cyan legs
-        draw_line_smooth(canvas, left_leg_base_x, left_leg_base_y, llx, lly, kc_cyan, leg_thick);
-        draw_line_smooth(canvas, right_leg_base_x, right_leg_base_y, rlx, rly, kc_cyan, leg_thick);
+        draw_line_smooth(
+            canvas,
+            left_leg_base_x,
+            left_leg_base_y,
+            llx,
+            lly,
+            kc_cyan,
+            leg_thick,
+        );
+        draw_line_smooth(
+            canvas,
+            right_leg_base_x,
+            right_leg_base_y,
+            rlx,
+            rly,
+            kc_cyan,
+            leg_thick,
+        );
 
         // Cute bright red sneakers / boots!
         let foot_r = (radius * 0.34 * growth).max(1.2);
@@ -475,14 +583,30 @@ pub fn draw_kc_cheering(
     let ly0 = body_y - radius * 0.7;
     let lx1 = cx - horn_spread * 1.35;
     let ly1 = body_y - radius - horn_len + horn_wiggle;
-    draw_line_smooth(canvas, lx0, ly0, lx1, ly1, horn_color, (radius * 0.22).max(1.0));
+    draw_line_smooth(
+        canvas,
+        lx0,
+        ly0,
+        lx1,
+        ly1,
+        horn_color,
+        (radius * 0.22).max(1.0),
+    );
     canvas.fill_circle_smooth(lx1, ly1, (radius * 0.24).max(1.2), Rgb::WHITE);
 
     let rx0 = cx + horn_spread;
     let ry0 = body_y - radius * 0.7;
     let rx1 = cx + horn_spread * 1.35;
     let ry1 = body_y - radius - horn_len - horn_wiggle;
-    draw_line_smooth(canvas, rx0, ry0, rx1, ry1, horn_color, (radius * 0.22).max(1.0));
+    draw_line_smooth(
+        canvas,
+        rx0,
+        ry0,
+        rx1,
+        ry1,
+        horn_color,
+        (radius * 0.22).max(1.0),
+    );
     canvas.fill_circle_smooth(rx1, ry1, (radius * 0.24).max(1.2), Rgb::WHITE);
 
     // 5. Front-facing Eyes (Two big happy eyes looking at camera)
@@ -500,14 +624,34 @@ pub fn draw_kc_cheering(
     canvas.fill_circle_smooth(cx - eye_spacing, eye_y, pupil_r, Rgb::new(0, 20, 150));
     canvas.fill_circle_smooth(cx + eye_spacing, eye_y, pupil_r, Rgb::new(0, 20, 150));
     // White sparkle in pupil
-    canvas.fill_circle_smooth(cx - eye_spacing - 0.4, eye_y - 0.4, (pupil_r * 0.4).max(0.6), Rgb::WHITE);
-    canvas.fill_circle_smooth(cx + eye_spacing - 0.4, eye_y - 0.4, (pupil_r * 0.4).max(0.6), Rgb::WHITE);
+    canvas.fill_circle_smooth(
+        cx - eye_spacing - 0.4,
+        eye_y - 0.4,
+        (pupil_r * 0.4).max(0.6),
+        Rgb::WHITE,
+    );
+    canvas.fill_circle_smooth(
+        cx + eye_spacing - 0.4,
+        eye_y - 0.4,
+        (pupil_r * 0.4).max(0.6),
+        Rgb::WHITE,
+    );
 
     // Cute pink blush cheeks
     let blush_r = (radius * 0.22).max(1.0);
     let blush_col = Rgb::new(255, 140, 170);
-    canvas.fill_circle_smooth(cx - radius * 0.65, body_y + radius * 0.15, blush_r, blush_col);
-    canvas.fill_circle_smooth(cx + radius * 0.65, body_y + radius * 0.15, blush_r, blush_col);
+    canvas.fill_circle_smooth(
+        cx - radius * 0.65,
+        body_y + radius * 0.15,
+        blush_r,
+        blush_col,
+    );
+    canvas.fill_circle_smooth(
+        cx + radius * 0.65,
+        body_y + radius * 0.15,
+        blush_r,
+        blush_col,
+    );
 
     // 6. Cute Teeth-Showing Smile!
     let mouth_cx = cx;
@@ -578,12 +722,23 @@ pub fn draw_ghost_death(
     // Flashing death colors
     let flash = (anim_time * 24.0).sin() > 0.0;
     let ghost_state = if flash {
-        GhostState::Fading { time_remaining: 0.1 }
+        GhostState::Fading {
+            time_remaining: 0.1,
+        }
     } else {
         GhostState::Vulnerable
     };
 
-    draw_ghost(canvas, cx, float_y, cur_rad, 0.0, ghost_state, config, anim_time);
+    draw_ghost(
+        canvas,
+        cx,
+        float_y,
+        cur_rad,
+        0.0,
+        ghost_state,
+        config,
+        anim_time,
+    );
 
     // Ghost soul particles floating upward
     let num_soul = 6;

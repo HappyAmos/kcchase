@@ -35,7 +35,11 @@ impl ColorMode {
             if lower == "linux" || lower.contains("8color") || lower == "vt100" {
                 return ColorMode::Ansi8;
             }
-            if lower.contains("color") || lower.contains("xterm") || lower.contains("screen") || lower.contains("tmux") {
+            if lower.contains("color")
+                || lower.contains("xterm")
+                || lower.contains("screen")
+                || lower.contains("tmux")
+            {
                 // Modern terminals commonly support at least 256 colors
                 return ColorMode::Ansi256;
             }
@@ -74,7 +78,11 @@ pub struct Rgb {
 
 impl Rgb {
     pub const BLACK: Rgb = Rgb { r: 0, g: 0, b: 0 };
-    pub const WHITE: Rgb = Rgb { r: 255, g: 255, b: 255 };
+    pub const WHITE: Rgb = Rgb {
+        r: 255,
+        g: 255,
+        b: 255,
+    };
 
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
         Rgb { r, g, b }
@@ -249,15 +257,15 @@ mod tests {
         let bright_red = Rgb::new(255, 85, 85);
         let dark_red = Rgb::new(170, 0, 0);
 
-        assert_eq!(yellow.to_ansi16(), 11);      // Bright yellow
-        assert_eq!(bright_red.to_ansi16(), 9);   // Bright red
-        assert_eq!(dark_red.to_ansi16(), 1);     // Dark red
+        assert_eq!(yellow.to_ansi16(), 11); // Bright yellow
+        assert_eq!(bright_red.to_ansi16(), 9); // Bright red
+        assert_eq!(dark_red.to_ansi16(), 1); // Dark red
         assert_eq!(bright_blue.to_ansi16(), 12); // Bright blue
-        assert_eq!(dark_blue.to_ansi16(), 4);    // Dark blue
+        assert_eq!(dark_blue.to_ansi16(), 4); // Dark blue
 
-        assert_eq!(yellow.to_ansi8(), 3);        // Yellow
-        assert_eq!(dark_red.to_ansi8(), 1);      // Red
-        assert_eq!(dark_blue.to_ansi8(), 4);     // Blue
+        assert_eq!(yellow.to_ansi8(), 3); // Yellow
+        assert_eq!(dark_red.to_ansi8(), 1); // Red
+        assert_eq!(dark_blue.to_ansi8(), 4); // Blue
 
         let mut buf = String::new();
         yellow.write_fg_ansi(&mut buf, ColorMode::Truecolor);

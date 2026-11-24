@@ -1,0 +1,30 @@
+name: Translation Request
+description: Request a new language locale or report a translation issue in locales/
+title: "[Translation]: "
+labels: ["i18n"]
+body:
+  - type: input
+    id: locale
+    attributes:
+      label: Target Language / Locale Code
+      description: POSIX locale code (e.g., `es_es`, `fr_fr`, `de_de`, `ja_jp`).
+      placeholder: es_es
+    validations:
+      required: true
+  - type: dropdown
+    id: request_type
+    attributes:
+      label: Request Type
+      options:
+        - Add a new language locale file
+        - Fix or improve an existing translation
+        - Sync missing keys with locales/en_us.yml
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details / Proposed Translations
+      description: Provide context, corrections, or a draft based on `locales/en_us.yml` (see `TRANSLATIONS.md`).
+    validations:
+      required: true
