@@ -43,7 +43,7 @@ Clone the repository and run the `install.sh` script. It automatically compiles
 
 ```bash
 # Clone the repository
-git clone https://github.com/AndrewAlbrightTX/kcchase.git
+git clone https://github.com/HappyAmos/kcchase.git
 cd kcchase
 
 # Run the installer
