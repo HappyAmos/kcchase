@@ -2121,8 +2121,8 @@ mod tests {
         );
 
         // Deactivate 5 pills (7 remain)
-        for i in 0..5 {
-            sim.pellets[i].active = false;
+        for pellet in &mut sim.pellets[..5] {
+            pellet.active = false;
         }
         let mid_speed = sim.current_pill_speed(base_speed);
         assert!(
@@ -2133,8 +2133,8 @@ mod tests {
         );
 
         // Deactivate until exactly 2 pills remain
-        for i in 5..8 {
-            sim.pellets[i].active = false;
+        for pellet in &mut sim.pellets[5..8] {
+            pellet.active = false;
         }
         sim.super_pellets[0].active = false;
         sim.super_pellets[1].active = false;
