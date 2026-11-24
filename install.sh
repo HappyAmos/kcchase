@@ -38,6 +38,7 @@ if [[ ":$PATH:" != *":${TARGET_DIR}:"* ]]; then
     echo ""
     echo "Note: ${TARGET_DIR} is not currently in your PATH."
     echo "You can add it by appending this line to your ~/.bashrc or ~/.profile:"
+    # shellcheck disable=SC2016
     echo '  export PATH="$HOME/.local/bin:$PATH"'
 fi
 

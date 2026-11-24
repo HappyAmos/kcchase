@@ -103,12 +103,10 @@ where
                     }
                 }
             }
-            "--speed" => {
-                if i + 1 < args.len() {
-                    i += 1;
-                    if let Ok(val) = args[i].parse::<f32>() {
-                        speed = val.clamp(0.2, 5.0);
-                    }
+            "--speed" if i + 1 < args.len() => {
+                i += 1;
+                if let Ok(val) = args[i].parse::<f32>() {
+                    speed = val.clamp(0.2, 5.0);
                 }
             }
             _ => {}

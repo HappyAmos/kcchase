@@ -50,7 +50,7 @@ impl Direction {
         }
     }
 
-    pub fn to_angle(&self) -> f32 {
+    pub fn to_angle(self) -> f32 {
         match self {
             Direction::Right => 0.0,
             Direction::Down => std::f32::consts::FRAC_PI_2,
@@ -124,10 +124,10 @@ impl Maze {
         let mut cols = (canvas_w as f32 / desired_cell_size).round() as usize;
         let mut rows = (canvas_h as f32 / desired_cell_size).round() as usize;
 
-        if cols % 2 == 0 {
+        if cols.is_multiple_of(2) {
             cols += 1;
         }
-        if rows % 2 == 0 {
+        if rows.is_multiple_of(2) {
             rows += 1;
         }
         cols = cols.clamp(13, 41);
@@ -148,7 +148,7 @@ impl Maze {
             _ => (Rgb::new(0, 210, 240), Rgb::new(160, 245, 255)),  // Cyan
         };
 
-        let half_cols = (cols + 1) / 2;
+        let half_cols = cols.div_ceil(2);
 
         // Step 1: Initialize paths on odd grid coordinates in the left half
         for r in (1..rows - 1).step_by(2) {
@@ -277,12 +277,12 @@ impl Maze {
         // Add side warp tunnels on a middle row!
         // Make sure warp row is an odd index so it connects directly to node grid
         let mut warp_row = rows / 2;
-        if warp_row % 2 == 0 {
+        if warp_row.is_multiple_of(2) {
             warp_row = (warp_row + 1).min(rows - 2);
         }
 
         // Open warp passages on left and right edges
-        tiles[warp_row * cols + 0] = Tile::Path;
+        tiles[warp_row * cols] = Tile::Path;
         tiles[warp_row * cols + 1] = Tile::Path;
         tiles[warp_row * cols + 2] = Tile::Path;
 
@@ -303,12 +303,12 @@ impl Maze {
         // Seal outer border completely EXCEPT for the two warp tunnel openings
         for r in 0..rows {
             if r != warp_row {
-                tiles[r * cols + 0] = Tile::Wall;
+                tiles[r * cols] = Tile::Wall;
                 tiles[r * cols + (cols - 1)] = Tile::Wall;
             }
         }
         for c in 0..cols {
-            tiles[0 * cols + c] = Tile::Wall;
+            tiles[c] = Tile::Wall;
             tiles[(rows - 1) * cols + c] = Tile::Wall;
         }
 
@@ -332,12 +332,11 @@ impl Maze {
 
     pub fn is_passable(&self, c: i32, r: i32) -> bool {
         // Warp tunnel entrance/exit is only valid on the designated warp row
-        if let Some(wr) = self.warp_row {
-            if r == wr as i32 {
-                if c == -1 || c == self.cols as i32 {
-                    return true;
-                }
-            }
+        if let Some(wr) = self.warp_row
+            && r == wr as i32
+            && (c == -1 || c == self.cols as i32)
+        {
+            return true;
         }
         if c < 0 || c >= self.cols as i32 || r < 0 || r >= self.rows as i32 {
             return false;
