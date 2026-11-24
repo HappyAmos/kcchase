@@ -65,6 +65,7 @@ impl GhostConfig {
 
 /// Draw KC Munchkin at (cx, cy) with given radius, direction angle (radians), mouth opening (0.0 to 1.0),
 /// whether super-charged, whether terrified (chased), and animation time.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_kc_munchkin(
     canvas: &mut Canvas,
     cx: f32,
@@ -234,6 +235,7 @@ pub fn draw_ghost_eyes(
 }
 
 /// Draw Ghost / Muncher at (cx, cy) with given state, animation time, direction and config.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_ghost(
     canvas: &mut Canvas,
     cx: f32,

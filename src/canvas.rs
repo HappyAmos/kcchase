@@ -279,9 +279,9 @@ fn quantize_2x2(tl: Rgb, tr: Rgb, bl: Rgb, br: Rgb, default_bg: Rgb) -> (Rgb, Rg
             continue;
         }
         let mut found = false;
-        for i in 0..num_candidates {
-            if fg_candidates[i].0 == c {
-                fg_candidates[i].1 += 1;
+        for candidate in &mut fg_candidates[..num_candidates] {
+            if candidate.0 == c {
+                candidate.1 += 1;
                 found = true;
                 break;
             }
@@ -296,10 +296,10 @@ fn quantize_2x2(tl: Rgb, tr: Rgb, bl: Rgb, br: Rgb, default_bg: Rgb) -> (Rgb, Rg
         // Pick the one with highest frequency
         let mut best = fg_candidates[0].0;
         let mut max_count = fg_candidates[0].1;
-        for i in 1..num_candidates {
-            if fg_candidates[i].1 > max_count {
-                max_count = fg_candidates[i].1;
-                best = fg_candidates[i].0;
+        for &(color, count) in &fg_candidates[1..num_candidates] {
+            if count > max_count {
+                max_count = count;
+                best = color;
             }
         }
         best

@@ -646,7 +646,8 @@ impl ChaseSimulation {
         }
 
         // 4. Place exactly 1 Power Pill and 2 Regular Pills in each of the 4 corner quadrants (12 total pills)
-        let corner_targets: [(i32, i32, fn(i32, i32, i32, i32) -> bool); 4] = [
+        type QuadrantTarget = (i32, i32, fn(i32, i32, i32, i32) -> bool);
+        let corner_targets: [QuadrantTarget; 4] = [
             (1, 1, |c, r, mc, mr| c < mc && r < mr),
             (self.maze.cols as i32 - 2, 1, |c, r, mc, mr| c > mc && r < mr),
             (1, self.maze.rows as i32 - 2, |c, r, mc, mr| c < mc && r > mr),
@@ -1238,17 +1239,16 @@ impl ChaseSimulation {
         match next_phase {
             Phase::ApproachingPellet => {
                 self.kc.speed = base_speed;
-                if self.kc.advance(dt, &self.maze) {
-                    if let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row) {
-                        if let Some(next_dir) = self.maze.bfs_next_direction(
-                            self.kc.col,
-                            self.kc.row,
-                            target_c,
-                            target_r,
-                        ) {
-                            self.kc.set_next_direction(next_dir, &self.maze);
-                        }
-                    }
+                if self.kc.advance(dt, &self.maze)
+                    && let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row)
+                    && let Some(next_dir) = self.maze.bfs_next_direction(
+                        self.kc.col,
+                        self.kc.row,
+                        target_c,
+                        target_r,
+                    )
+                {
+                    self.kc.set_next_direction(next_dir, &self.maze);
                 }
             }
 
@@ -1409,25 +1409,25 @@ impl ChaseSimulation {
                                 self.kc.dir,
                             );
                             self.kc.set_next_direction(flee, &self.maze);
-                        } else if let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row) {
-                            if let Some(next_dir) = self.maze.bfs_next_direction(
+                        } else if let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row)
+                            && let Some(next_dir) = self.maze.bfs_next_direction(
                                 self.kc.col,
                                 self.kc.row,
                                 target_c,
                                 target_r,
-                            ) {
-                                self.kc.set_next_direction(next_dir, &self.maze);
-                            }
+                            )
+                        {
+                            self.kc.set_next_direction(next_dir, &self.maze);
                         }
-                    } else if let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row) {
-                        if let Some(next_dir) = self.maze.bfs_next_direction(
+                    } else if let Some((target_c, target_r, _)) = self.nearest_active_pill(self.kc.col, self.kc.row)
+                        && let Some(next_dir) = self.maze.bfs_next_direction(
                             self.kc.col,
                             self.kc.row,
                             target_c,
                             target_r,
-                        ) {
-                            self.kc.set_next_direction(next_dir, &self.maze);
-                        }
+                        )
+                    {
+                        self.kc.set_next_direction(next_dir, &self.maze);
                     }
                 }
 
@@ -1675,10 +1675,8 @@ fn entity_distance(e1: &MazeEntity, e2: &MazeEntity, maze: &Maze) -> f32 {
     let warp_r = maze.warp_row.unwrap_or(maze.rows / 2) as i32;
 
     let mut dx = (e1.x - e2.x).abs();
-    if e1.row == warp_r && e2.row == warp_r {
-        if dx > canvas_w * 0.5 {
-            dx = canvas_w - dx;
-        }
+    if e1.row == warp_r && e2.row == warp_r && dx > canvas_w * 0.5 {
+        dx = canvas_w - dx;
     }
     let dy = e1.y - e2.y;
     (dx * dx + dy * dy).sqrt()
