@@ -139,8 +139,12 @@ where
     }
 }
 
+fn version_string() -> String {
+    format!("kcchase {}", env!("CARGO_PKG_VERSION"))
+}
+
 fn print_version() {
-    println!("kcchase {}", env!("CARGO_PKG_VERSION"));
+    println!("{}", version_string());
 }
 
 fn print_help() {
@@ -361,5 +365,13 @@ mod tests {
 
         let args_default = parse_args_from(vec!["kcchase"]);
         assert!(!args_default.show_version);
+    }
+
+    #[test]
+    fn test_version_string_uses_cargo_toml() {
+        assert_eq!(
+            version_string(),
+            format!("kcchase {}", env!("CARGO_PKG_VERSION"))
+        );
     }
 }

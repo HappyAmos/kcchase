@@ -2713,35 +2713,56 @@ mod tests {
         // Test 3: KC catches a vulnerable ghost fleeing across consecutive frames
         sim.phase = Phase::KcChasing { duration: 8.0 };
         sim.ghosts[1].state = GhostState::Vulnerable;
-        // Move pills away to the opposite corner so KC pursues the nearby vulnerable ghost
+        sim.ghosts[2].state = GhostState::InCage { timer: 10.0 };
+        // Move pills away to the opposite corner (including entity tile coords) so KC pursues Ghost 1
         let far_c = sim.maze.cols as i32 - 2;
         let far_r = sim.maze.rows as i32 - 2;
         let (fpx, fpy) = sim.maze.tile_to_pixel(far_c as f32, far_r as f32);
         for p in sim.pellets.iter_mut() {
             p.col = far_c;
             p.row = far_r;
+            p.entity.col = far_c;
+            p.entity.row = far_r;
+            p.entity.target_col = far_c;
+            p.entity.target_row = far_r;
             p.entity.x = fpx;
             p.entity.y = fpy;
         }
         for sp in sim.super_pellets.iter_mut() {
             sp.col = far_c;
             sp.row = far_r;
+            sp.entity.col = far_c;
+            sp.entity.row = far_r;
+            sp.entity.target_col = far_c;
+            sp.entity.target_row = far_r;
             sp.entity.x = fpx;
             sp.entity.y = fpy;
         }
 
-        // Place Ghost 1 2 tiles away from KC
+        // Place Ghost 1 two passable steps away from KC along an open corridor
+        let first_dir = sim.maze.available_directions(test_c, test_r)[0];
+        let step1_c = test_c + first_dir.dx();
+        let step1_r = test_r + first_dir.dy();
+        let second_dir = sim
+            .maze
+            .available_directions(step1_c, step1_r)
+            .into_iter()
+            .find(|&d| d != first_dir.opposite())
+            .unwrap_or(first_dir);
+        let g1_c = step1_c + second_dir.dx();
+        let g1_r = step1_r + second_dir.dy();
+
         sim.kc.col = test_c;
         sim.kc.row = test_r;
         sim.kc.target_col = test_c;
         sim.kc.target_row = test_r;
         sim.kc.x = tx;
         sim.kc.y = ty;
-        sim.ghosts[1].entity.col = test_c;
-        sim.ghosts[1].entity.row = test_r + 2;
-        sim.ghosts[1].entity.target_col = test_c;
-        sim.ghosts[1].entity.target_row = test_r + 2;
-        let (g1x, g1y) = sim.maze.tile_to_pixel(test_c as f32, (test_r + 2) as f32);
+        sim.ghosts[1].entity.col = g1_c;
+        sim.ghosts[1].entity.row = g1_r;
+        sim.ghosts[1].entity.target_col = g1_c;
+        sim.ghosts[1].entity.target_row = g1_r;
+        let (g1x, g1y) = sim.maze.tile_to_pixel(g1_c as f32, g1_r as f32);
         sim.ghosts[1].entity.x = g1x;
         sim.ghosts[1].entity.y = g1y;
 
