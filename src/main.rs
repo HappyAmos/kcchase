@@ -9,7 +9,7 @@ use canvas::Canvas;
 use chase::{ChaseSimulation, StartSequence};
 use color::ColorMode;
 use std::env;
-use std::io::{self, stdout, Write};
+use std::io::{self, Write, stdout};
 use std::time::{Duration, Instant};
 use terminal::{InputWatcher, PollResult, TerminalGuard};
 
@@ -80,7 +80,10 @@ where
                             start_sequence = StartSequence::Game;
                         }
                         other => {
-                            eprintln!("Unknown sequence mode '{}'. Options: game, intermission", other);
+                            eprintln!(
+                                "Unknown sequence mode '{}'. Options: game, intermission",
+                                other
+                            );
                         }
                     }
                 }
@@ -91,7 +94,10 @@ where
                     if let Some(m) = ColorMode::from_str_opt(&args[i]) {
                         color_mode = Some(m);
                     } else {
-                        eprintln!("Unknown color mode '{}'. Options: truecolor, 256, 16, 8", args[i]);
+                        eprintln!(
+                            "Unknown color mode '{}'. Options: truecolor, 256, 16, 8",
+                            args[i]
+                        );
                     }
                 }
             }
@@ -147,14 +153,20 @@ fn print_help() {
     println!("    -h, --help               Print this help message and exit");
     println!("    -v, --version            Print version information and exit");
     println!("    -i, --info               Display detected terminal color capabilities and exit");
-    println!("    -c, --color <MODE>       Select color mode: truecolor, 256, 16, 8 (default: auto)");
+    println!(
+        "    -c, --color <MODE>       Select color mode: truecolor, 256, 16, 8 (default: auto)"
+    );
     println!("    --fps <NUMBER>           Set target frame rate (default: 60, range: 15-120)");
     println!("    --speed <FLOAT>          Set animation speed multiplier (default: 1.0)");
     println!("    -k, --keyboard           Exit on keyboard input only (ignores mouse movement)");
-    println!("    -m, --mouse              Exit on mouse movement only (ignores keyboard, except Ctrl+C/Esc)");
+    println!(
+        "    -m, --mouse              Exit on mouse movement only (ignores keyboard, except Ctrl+C/Esc)"
+    );
     println!("    --intermission, --cutscene Start with the intermission animation sequence");
     println!("    --game                     Start with the game sequence (default)");
-    println!("    --sequence <MODE>          Select starting sequence: game (default), intermission");
+    println!(
+        "    --sequence <MODE>          Select starting sequence: game (default), intermission"
+    );
     println!();
     println!("EXIT:");
     println!("    Press any key or move the mouse to exit the screensaver.");
@@ -200,7 +212,8 @@ fn main() -> io::Result<()> {
     let _guard = TerminalGuard::enter(args.exit_mouse)?;
 
     let mut canvas = Canvas::new(term_cols, term_rows);
-    let mut sim = ChaseSimulation::new_with_sequence(canvas.width, canvas.height, args.start_sequence);
+    let mut sim =
+        ChaseSimulation::new_with_sequence(canvas.width, canvas.height, args.start_sequence);
     let mut watcher = InputWatcher::new(args.exit_keyboard, args.exit_mouse);
 
     let frame_duration = Duration::from_micros(1_000_000 / args.fps);
@@ -311,7 +324,10 @@ mod tests {
     #[test]
     fn test_sequence_flags_intermission_and_cutscene() {
         let args_intermission = parse_args_from(vec!["kcchase", "--intermission"]);
-        assert_eq!(args_intermission.start_sequence, StartSequence::Intermission);
+        assert_eq!(
+            args_intermission.start_sequence,
+            StartSequence::Intermission
+        );
 
         let args_cutscene = parse_args_from(vec!["kcchase", "--cutscene"]);
         assert_eq!(args_cutscene.start_sequence, StartSequence::Intermission);

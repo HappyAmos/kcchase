@@ -83,7 +83,10 @@ impl GhostCage {
     pub fn door_tile(&self, dir: Direction) -> (usize, usize) {
         let dc = dir.dx();
         let dr = dir.dy();
-        ((self.center_c as i32 + dc) as usize, (self.center_r as i32 + dr) as usize)
+        (
+            (self.center_c as i32 + dc) as usize,
+            (self.center_r as i32 + dr) as usize,
+        )
     }
 
     pub fn is_inside(&self, c: i32, r: i32) -> bool {
@@ -463,7 +466,14 @@ impl Maze {
     }
 
     /// Pick the direction at an intersection that maximizes distance to the chaser (evasion)
-    pub fn flee_direction(&self, sc: i32, sr: i32, chaser_c: i32, chaser_r: i32, current_dir: Direction) -> Direction {
+    pub fn flee_direction(
+        &self,
+        sc: i32,
+        sr: i32,
+        chaser_c: i32,
+        chaser_r: i32,
+        current_dir: Direction,
+    ) -> Direction {
         let available = self.available_directions(sc, sr);
         if available.is_empty() {
             return current_dir;
@@ -473,7 +483,10 @@ impl Maze {
 
         // Avoid turning back directly into chaser unless dead end
         let candidates: Vec<Direction> = if available.len() > 1 {
-            available.into_iter().filter(|&d| d != current_dir.opposite()).collect()
+            available
+                .into_iter()
+                .filter(|&d| d != current_dir.opposite())
+                .collect()
         } else {
             available
         };
@@ -552,9 +565,11 @@ impl Maze {
 
                     // Check neighbors to draw beautiful arcade wall edges
                     let top_open = r == 0 || self.tiles[(r - 1) * self.cols + c] == Tile::Path;
-                    let btm_open = r + 1 == self.rows || self.tiles[(r + 1) * self.cols + c] == Tile::Path;
+                    let btm_open =
+                        r + 1 == self.rows || self.tiles[(r + 1) * self.cols + c] == Tile::Path;
                     let left_open = c == 0 || self.tiles[r * self.cols + (c - 1)] == Tile::Path;
-                    let right_open = c + 1 == self.cols || self.tiles[r * self.cols + (c + 1)] == Tile::Path;
+                    let right_open =
+                        c + 1 == self.cols || self.tiles[r * self.cols + (c + 1)] == Tile::Path;
 
                     // Fill wall core softly
                     for y in py0..py1 {

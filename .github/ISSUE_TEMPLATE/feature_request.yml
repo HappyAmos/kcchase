@@ -1,0 +1,26 @@
+name: Feature Request
+description: Propose a new feature, animation, or CLI option for kcchase
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem or use case does this feature address?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the desired behavior, visual design, or CLI flag.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative approaches or workarounds you considered.
+    validations:
+      required: false

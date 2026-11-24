@@ -7,22 +7,22 @@ use std::fmt::Write as FmtWrite;
 /// bit 2 (4): Bottom-Left
 /// bit 3 (8): Bottom-Right
 const QUADRANT_CHARS: [char; 16] = [
-    ' ',  // 0000: None
-    '▘',  // 0001: Top-Left
-    '▝',  // 0010: Top-Right
-    '▀',  // 0011: Top-Left + Top-Right (Upper Half Block)
-    '▖',  // 0100: Bottom-Left
-    '▌',  // 0101: Top-Left + Bottom-Left (Left Half Block)
-    '▞',  // 0110: Top-Right + Bottom-Left
-    '▛',  // 0111: Top-Left + Top-Right + Bottom-Left
-    '▗',  // 1000: Bottom-Right
-    '▚',  // 1001: Top-Left + Bottom-Right
-    '▐',  // 1010: Top-Right + Bottom-Right (Right Half Block)
-    '▜',  // 1011: Top-Left + Top-Right + Bottom-Right
-    '▄',  // 1100: Bottom-Left + Bottom-Right (Lower Half Block)
-    '▙',  // 1101: Top-Left + Bottom-Left + Bottom-Right
-    '▟',  // 1110: Top-Right + Bottom-Left + Bottom-Right
-    '█',  // 1111: All 4 (Full Block)
+    ' ', // 0000: None
+    '▘', // 0001: Top-Left
+    '▝', // 0010: Top-Right
+    '▀', // 0011: Top-Left + Top-Right (Upper Half Block)
+    '▖', // 0100: Bottom-Left
+    '▌', // 0101: Top-Left + Bottom-Left (Left Half Block)
+    '▞', // 0110: Top-Right + Bottom-Left
+    '▛', // 0111: Top-Left + Top-Right + Bottom-Left
+    '▗', // 1000: Bottom-Right
+    '▚', // 1001: Top-Left + Bottom-Right
+    '▐', // 1010: Top-Right + Bottom-Right (Right Half Block)
+    '▜', // 1011: Top-Left + Top-Right + Bottom-Right
+    '▄', // 1100: Bottom-Left + Bottom-Right (Lower Half Block)
+    '▙', // 1101: Top-Left + Bottom-Left + Bottom-Right
+    '▟', // 1110: Top-Right + Bottom-Left + Bottom-Right
+    '█', // 1111: All 4 (Full Block)
 ];
 
 #[derive(Debug, Clone)]

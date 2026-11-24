@@ -2,14 +2,12 @@ use crossterm::{
     cursor::{Hide, Show},
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, MouseEventKind},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use std::io::{self, stdout, Write};
+use std::io::{self, Write, stdout};
 use std::panic;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 /// RAII Guard that ensures the terminal is cleanly restored on drop or panic.
@@ -37,11 +35,7 @@ impl TerminalGuard {
                         Show
                     );
                 } else {
-                    let _ = execute!(
-                        io::stdout(),
-                        LeaveAlternateScreen,
-                        Show
-                    );
+                    let _ = execute!(io::stdout(), LeaveAlternateScreen, Show);
                 }
             }
             default_hook(info);
@@ -78,11 +72,7 @@ impl Drop for TerminalGuard {
                     Show
                 );
             } else {
-                let _ = execute!(
-                    io::stdout(),
-                    LeaveAlternateScreen,
-                    Show
-                );
+                let _ = execute!(io::stdout(), LeaveAlternateScreen, Show);
             }
             let _ = io::stdout().flush();
         }
@@ -115,7 +105,10 @@ impl InputWatcher {
         // Even when general keyboard exit is disabled (e.g. --mouse),
         // allow emergency fail-safes (Ctrl+C, Esc) to exit safely.
         if key_event.modifiers.contains(event::KeyModifiers::CONTROL)
-            && matches!(key_event.code, event::KeyCode::Char('c') | event::KeyCode::Char('C'))
+            && matches!(
+                key_event.code,
+                event::KeyCode::Char('c') | event::KeyCode::Char('C')
+            )
         {
             return PollResult::Exit("Ctrl+C pressed".into());
         }
@@ -220,8 +213,14 @@ mod tests {
         let normal_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
         let space_key = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE);
 
-        assert!(matches!(watcher.handle_key_event(normal_key), PollResult::Exit(_)));
-        assert!(matches!(watcher.handle_key_event(space_key), PollResult::Exit(_)));
+        assert!(matches!(
+            watcher.handle_key_event(normal_key),
+            PollResult::Exit(_)
+        ));
+        assert!(matches!(
+            watcher.handle_key_event(space_key),
+            PollResult::Exit(_)
+        ));
     }
 
     #[test]
@@ -237,7 +236,10 @@ mod tests {
         // Fail-safe keys must exit
         let ctrl_c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
         let esc = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
-        assert!(matches!(watcher.handle_key_event(ctrl_c), PollResult::Exit(_)));
+        assert!(matches!(
+            watcher.handle_key_event(ctrl_c),
+            PollResult::Exit(_)
+        ));
         assert!(matches!(watcher.handle_key_event(esc), PollResult::Exit(_)));
     }
 }

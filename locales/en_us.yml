@@ -1,0 +1,42 @@
+# Canonical English (US) locale for kcchase
+# Keep all keys in parity across locale files in locales/
+
+meta:
+  locale: en_us
+  language: "English (US)"
+
+app:
+  title: "kcchase - K.C. Munchkin Terminal Screensaver"
+  version_format: "kcchase {version}"
+
+cli:
+  usage_header: "USAGE:"
+  usage_line: "    kcchase [OPTIONS]"
+  options_header: "OPTIONS:"
+  option_help: "    -h, --help               Print this help message and exit"
+  option_version: "    -v, --version            Print version information and exit"
+  option_info: "    -i, --info               Display detected terminal color capabilities and exit"
+  option_color: "    -c, --color <MODE>       Select color mode: truecolor, 256, 16, 8 (default: auto)"
+  option_fps: "    --fps <NUMBER>           Set target frame rate (default: 60, range: 15-120)"
+  option_speed: "    --speed <FLOAT>          Set animation speed multiplier (default: 1.0)"
+  option_keyboard: "    -k, --keyboard           Exit on keyboard input only (ignores mouse movement)"
+  option_mouse: "    -m, --mouse              Exit on mouse movement only (ignores keyboard, except Ctrl+C/Esc)"
+  option_intermission: "    --intermission, --cutscene Start with the intermission animation sequence"
+  option_game: "    --game                     Start with the game sequence (default)"
+  option_sequence: "    --sequence <MODE>          Select starting sequence: game (default), intermission"
+  exit_header: "EXIT:"
+  exit_line_1: "    Press any key or move the mouse to exit the screensaver."
+  exit_line_2: "    Use --keyboard or --mouse to restrict the exit trigger."
+  unknown_sequence: "Unknown sequence mode '{mode}'. Options: game, intermission"
+  unknown_color: "Unknown color mode '{mode}'. Options: truecolor, 256, 16, 8"
+
+info:
+  header: "Terminal Color Capability Detection:"
+  active_mode: "  Active Mode: {active_mode}"
+  colorterm: "  COLORTERM:   {value}"
+  term: "  TERM:        {value}"
+  available_modes: "Available Modes: truecolor (24-bit), 256 (8-bit), 16 (4-bit), 8 (3-bit)"
+
+hud:
+  score_label: "SCORE"
+  high_score_label: "HI"
