@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-24
+
 ### Added
 - Community governance files (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md`, `TRANSLATIONS.md`).
 - Canonical single-file locale scaffold (`locales/en_us.yml`) and translation request issue template.
 - Unified `Makefile` (`make check`, `make fmt`, `make lint`, `make test`).
 - GitHub PR/Issue templates, Dependabot configuration, and tag-triggered `release.yml` workflow.
+
+### Changed
+- Updated `rand` to `0.10.4` and GitHub Actions workflow dependencies (`actions/checkout`, `softprops/action-gh-release`).
+- Enforced `rustfmt` and strict Clippy/ShellCheck checks in CI.
 
 ## [0.1.0] - 2026-11-08
 
