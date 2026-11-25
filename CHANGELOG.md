@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `ACCESSIBILITY.md` documenting input, color-fallback, and motion controls alongside known limitations.
+- Automated weekly release PR workflow (`.github/workflows/weekly-release.yml`) and Release Cycle documentation in `CONTRIBUTING.md`.
+- Cross-platform (`macos-latest`, `windows-latest`) build and Clippy check matrix in `rust-app.yml`.
+- `SHA256SUMS.txt` release checksum artifact and `workflow_dispatch` / `workflow_call` triggers in `release.yml`.
+
+### Changed
+- Pinned all third-party GitHub Actions to immutable commit SHAs and added `concurrency:` cancellation groups to CI workflows.
+- Grouped Dependabot minor/patch Cargo updates and GitHub Actions updates in `.github/dependabot.yml`.
+
 ## [0.1.1] - 2026-11-24
 
 ### Added

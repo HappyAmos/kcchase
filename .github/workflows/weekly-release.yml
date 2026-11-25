@@ -1,0 +1,211 @@
+name: Weekly Release
+
+on:
+  schedule:
+    - cron: "0 23 * * 5"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "SemVer bump level"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+      force:
+        description: "Create release PR even if no feat/fix/perf/refactor commits exist since last tag"
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-release:
+    name: Prepare Release PR
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check for releasable commits
+        id: check
+        env:
+          INPUT_BUMP: ${{ inputs.bump }}
+          INPUT_FORCE: ${{ inputs.force }}
+        run: |
+          LATEST_TAG="$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)"
+          if [ -n "${LATEST_TAG}" ]; then
+            RANGE="${LATEST_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          COMMITS="$(git log "${RANGE}" --pretty=format:'%s' | grep -E '^(feat|fix|perf|refactor)(\([^)]*\))?!?: ' || true)"
+          if [ -z "${COMMITS}" ] && [ "${INPUT_FORCE}" != "true" ]; then
+            echo "No releasable commits since ${LATEST_TAG:-initial commit}; skipping."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CURRENT_VERSION="$(sed -nE 's/^version = "([^"]+)"/\1/p' Cargo.toml | head -n 1)"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT_VERSION}"
+
+          if [ -n "${INPUT_BUMP}" ]; then
+            BUMP="${INPUT_BUMP}"
+          elif echo "${COMMITS}" | grep -qE '^feat(\([^)]*\))?!?: '; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          if [ "${BUMP}" = "minor" ]; then
+            NEXT_VERSION="${MAJOR}.$((MINOR + 1)).0"
+          else
+            NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "current_version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "next_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "next_tag=v${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "branch=release/v${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust toolchain
+        if: steps.check.outputs.should_release == 'true'
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+      - name: Bump version and update changelog
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          NEXT_VERSION: ${{ steps.check.outputs.next_version }}
+          NEXT_TAG: ${{ steps.check.outputs.next_tag }}
+          BRANCH: ${{ steps.check.outputs.branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B "${BRANCH}"
+
+          sed -i -E "0,/^version = \"[^\"]+\"/s//version = \"${NEXT_VERSION}\"/" Cargo.toml
+          cargo check --workspace
+
+          RELEASE_DATE="$(date -u +%Y-%m-%d)"
+          python3 - "${NEXT_VERSION}" "${RELEASE_DATE}" <<'PY'
+          import pathlib, re, sys
+
+          version, release_date = sys.argv[1], sys.argv[2]
+          path = pathlib.Path("CHANGELOG.md")
+          text = path.read_text(encoding="utf-8")
+
+          marker = "## [Unreleased]"
+          if marker not in text:
+              sys.exit("CHANGELOG.md is missing '## [Unreleased]' heading")
+
+          before, after = text.split(marker, 1)
+          next_heading = re.search(r"\n## \[", after)
+          if next_heading:
+              unreleased_body = after[:next_heading.start()].strip()
+              rest = after[next_heading.start():]
+          else:
+              unreleased_body = after.strip()
+              rest = ""
+
+          if not unreleased_body:
+              unreleased_body = "### Changed\n- Maintenance and stability improvements."
+
+          new_text = (
+              f"{before}{marker}\n\n"
+              f"## [{version}] - {release_date}\n\n"
+              f"{unreleased_body}\n"
+              f"{rest}"
+          )
+          path.write_text(new_text, encoding="utf-8")
+          PY
+
+          git add Cargo.toml Cargo.lock CHANGELOG.md
+          git commit -m "chore(release): prepare ${NEXT_TAG}"
+          git push --force-with-lease -u origin "${BRANCH}"
+
+      - name: Create or update release PR
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_TAG: ${{ steps.check.outputs.next_tag }}
+          BRANCH: ${{ steps.check.outputs.branch }}
+        run: |
+          TITLE="chore(release): prepare ${NEXT_TAG}"
+          BODY="Automated weekly release PR for **${NEXT_TAG}**.
+
+          Squash-merging this PR into \`main\` will automatically create the annotated \`${NEXT_TAG}\` tag and trigger the GitHub Release workflow."
+
+          EXISTING_PR="$(gh pr list --base main --head "${BRANCH}" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "${EXISTING_PR}" ]; then
+            gh pr edit "${EXISTING_PR}" --title "${TITLE}" --body "${BODY}"
+          else
+            gh pr create --base main --head "${BRANCH}" --title "${TITLE}" --body "${BODY}"
+          fi
+
+  tag-release:
+    name: Tag Merged Release
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      created: ${{ steps.tag.outputs.created }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create and push annotated release tag
+        id: tag
+        run: |
+          VERSION="$(sed -nE 's/^version = "([^"]+)"/\1/p' Cargo.toml | head -n 1)"
+          TAG="v${VERSION}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already exists; refusing to move published tag."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: tag-release
+    if: needs.tag-release.outputs.created == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag-release.outputs.tag }}

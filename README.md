@@ -160,6 +160,10 @@ Individual targets are also available: `make fmt`, `make lint`, and `make test`.
 
 `kcchase` uses single-file locale definitions under [`locales/`](locales/) (canonical base: [`locales/en_us.yml`](locales/en_us.yml)). See [TRANSLATIONS.md](TRANSLATIONS.md) for instructions on adding or updating a translation.
 
+## Accessibility
+
+See [ACCESSIBILITY.md](ACCESSIBILITY.md) for supported input, color-fallback, and motion controls, known limitations, and how to report accessibility barriers.
+
 ## Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md) before opening a pull request.

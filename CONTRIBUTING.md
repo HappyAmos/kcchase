@@ -48,6 +48,18 @@ Direct pushes to `main` are blocked by repository rules. All changes must go thr
 6. Write clear, concise commit messages (Conventional Commits style recommended, e.g., `feat: ...`, `fix: ...`, `docs: ...`).
 7. Push your branch and open a Pull Request against `main`, completing the PR checklist.
 
+## Release Cycle
+
+`kcchase` uses **trunk-based development** on `main`:
+
+- `main` is the live, always-tested development branch.
+- Releases follow [Semantic Versioning](https://semver.org/) (`vMAJOR.MINOR.PATCH`) and are documented in [`CHANGELOG.md`](CHANGELOG.md) in [Keep a Changelog](https://keepachangelog.com/) format.
+- Already-published `v*.*.*` tags are immutable and never moved.
+- An automated weekly release workflow (`.github/workflows/weekly-release.yml`) runs every Friday evening (and can be triggered manually via `workflow_dispatch`):
+  1. Checks for new user-facing commits (`feat`, `fix`, `perf`, `refactor`) since the latest tag and skips quietly if none exist.
+  2. Opens or updates a `chore(release): prepare vX.Y.Z` Pull Request on a `release/vX.Y.Z` branch that bumps `Cargo.toml`/`Cargo.lock` and rolls `CHANGELOG.md` entries into the new version heading.
+  3. Once reviewed and squash-merged into `main`, automatically creates and pushes the annotated `vX.Y.Z` tag and invokes `.github/workflows/release.yml` to build, verify, checksum (`SHA256SUMS.txt`), and publish the GitHub Release.
+
 ## Code of Conduct
 
 All contributors are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md).
